@@ -1,0 +1,61 @@
+project_id = "kjznyqdfhbsetigjshpj"
+
+[functions.process-eft-booking]
+verify_jwt = true
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.send-sms-otp]
+verify_jwt = false
+
+[functions.verify-sms-otp]
+verify_jwt = false
+
+[functions.calculate-booking-time]
+verify_jwt = false
+
+[functions.calculate-hourly-pricing]
+verify_jwt = false
+
+[functions.here-autocomplete]
+verify_jwt = false
+
+[functions.send-support-email]
+verify_jwt = false
+
+[functions.escalate-support-ticket]
+verify_jwt = true
+
+[functions.support-workflow-automation]
+verify_jwt = false
+
+[functions.create-demo-support-data]
+verify_jwt = false
+
+[functions.determine-ticket-priority]
+verify_jwt = false
+
+[functions.smart-support-handler]
+verify_jwt = false
+
+[functions.send-angel-connect-email]
+verify_jwt = false
+
+[functions.regenerate-invoice]
+verify_jwt = true
+
+[functions.generate-invoice-pdf]
+verify_jwt = true
+
+[functions.resend-webhook]
+verify_jwt = false
+
+[functions.generate-account-statement]
+verify_jwt = true
+
+[functions.generate-test-bookings-fixed]
+verify_jwt = true
+
+[functions.cleanup-test-bookings]
+verify_jwt = true

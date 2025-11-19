@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Royal Purple and Gold Theme */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* Pure white background in HSL */
+    --foreground: 210 24% 16%; /* Dark slate for high contrast in HSL */
+
+    --card: 0 0% 100%; /* Pure white in HSL */
+    --card-foreground: 210 24% 16%;
+
+    --popover: 0 0% 100%; /* Pure white in HSL */
+    --popover-foreground: 210 24% 16%;
+
+    --primary: 271 78% 56%; /* Rich purple - more saturated */
+    --primary-foreground: 0 0% 100%; /* Pure white in HSL */
+
+    --secondary: 38 94% 50%; /* Bright gold - high contrast */
+    --secondary-foreground: 210 24% 16%;
+
+    --muted: 220 14% 96%; /* Light gray in HSL */
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 220 43% 98%; /* Very light blue-gray in HSL */
+    --accent-foreground: 210 24% 16%;
+
+    --destructive: 0 62% 55%; /* Red in HSL */
+    --destructive-foreground: 0 0% 100%; /* Pure white in HSL */
+
+    --border: 220 13% 91%; /* Light border in HSL */
+    --input: 220 14% 96%; /* Light input background in HSL */
+    --ring: 271 78% 56%;
+
+    /* Sidebar specific variables */
+    --sidebar-background: 0 0% 100%; /* Same as card background */
+    --sidebar-foreground: 210 24% 16%;
+    --sidebar-primary: 271 78% 56%; /* Rich purple */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 271 78% 56%; /* Use primary for active state */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 271 78% 56%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Noto Sans', sans-serif;
+  }
+}
+
+/* Custom gradient classes */
+.royal-gradient {
+  background: linear-gradient(135deg, hsl(271 78% 56%) 0%, hsl(271 60% 70%) 100%);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, hsl(38 94% 50%) 0%, hsl(32 90% 47%) 100%);
+}
+
+.royal-shadow {
+  box-shadow: 0 10px 25px -5px hsl(271 78% 56% / 0.3);
+}
+
+.gold-shadow {
+  box-shadow: 0 8px 20px -5px hsl(38 94% 50% / 0.4);
+}
+
+.gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(38 94% 50%) 0%,
+    hsl(45 100% 60%) 25%,
+    hsl(38 94% 50%) 50%,
+    hsl(45 100% 60%) 75%,
+    hsl(38 94% 50%) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Mobile-optimized dashboard utilities */
+@layer utilities {
+  .container-responsive {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+  
+  .header-responsive {
+    @apply text-2xl sm:text-2xl md:text-3xl font-bold;
+  }
+  
+  .subheader-responsive {
+    @apply text-sm sm:text-sm md:text-base text-muted-foreground;
+  }
+  
+  .stats-grid-mobile {
+    @apply grid gap-3 grid-cols-2 lg:grid-cols-4;
+  }
+  
+  .admin-stats-grid {
+    @apply grid gap-3 grid-cols-2 md:grid-cols-4;
+  }
+  
+  .stat-card-title-mobile {
+    @apply text-[11px] sm:text-xs md:text-sm font-medium;
+  }
+  
+  .stat-card-number-mobile {
+    @apply text-lg sm:text-xl md:text-2xl font-bold;
+  }
+  
+  .action-buttons-mobile {
+    @apply flex flex-col sm:flex-row gap-2 w-full sm:w-auto;
+  }
+  
+  .mobile-stack {
+    @apply flex flex-col sm:flex-row gap-2;
+  }
+  
+  .mobile-card {
+    @apply block md:hidden p-3 border rounded-lg space-y-2;
+  }
+  
+  .desktop-table {
+    @apply hidden md:table;
+  }
+
+  /* Client Dashboard Mobile Utilities */
+  .client-header {
+    @apply text-xl sm:text-2xl md:text-3xl font-bold tracking-tight;
+  }
+  
+  .client-subheader {
+    @apply text-xs sm:text-sm md:text-base text-muted-foreground;
+  }
+  
+  .client-stats-grid {
+    @apply grid gap-3 grid-cols-2 lg:grid-cols-4;
+  }
+  
+  .client-card-compact {
+    @apply p-2 sm:p-3 md:p-4;
+  }
+  
+  .client-tabs-mobile {
+    @apply text-[10px] sm:text-xs md:text-sm px-1 sm:px-3;
+  }
+  
+  .client-button-stack {
+    @apply flex flex-col sm:flex-row gap-2 w-full sm:w-auto;
+  }
+  
+  .client-icon-sm {
+    @apply h-3 w-3 sm:h-4 sm:w-4;
+  }
+  
+  .client-icon-md {
+    @apply h-4 w-4 sm:h-5 sm:h-5;
+  }
+}
