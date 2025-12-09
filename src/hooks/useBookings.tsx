@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuthContext } from '@/components/AuthProvider';
 import { useMatchingNannies } from '@/hooks/useNannies';
+import { validateStoredBooking } from '@/utils/bookingValidation';
 
 type Booking = Tables<'bookings'>;
 type BookingInsert = TablesInsert<'bookings'>;
@@ -24,42 +25,75 @@ export const useBookings = () => {
   console.log('useBookings - User ID:', user?.id, 'User Type:', userType);
   
   const { data: bookings, isLoading: bookingsLoading, error, refetch } = useQuery({
-    queryKey: ['bookings', user?.id],
+    queryKey: ['bookings', user?.id, userType],
     queryFn: async () => {
       if (!user?.id) {
         console.log('useBookings - No user ID, returning empty array');
         return [];
       }
       
-      console.log('useBookings - Fetching bookings for:', user.id);
+      console.log('useBookings - Fetching bookings for:', user.id, 'Type:', userType);
       const { data, error } = await supabase
         .from('bookings')
         .select(`
           *,
           nannies!bookings_nanny_id_fkey (
             *,
-            profiles!nannies_id_fkey (*)
+            profiles!nannies_id_fkey (
+              id,
+              first_name,
+              last_name,
+              phone,
+              email
+            )
           ),
           clients!bookings_client_id_fkey (
             *,
-            profiles!clients_id_fkey (*)
+            profiles!clients_id_fkey (
+              id,
+              first_name,
+              last_name,
+              phone,
+              email
+            )
           )
         `)
         .eq(userType === 'client' ? 'client_id' : 'nanny_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .order('start_date', { ascending: false })
+        .limit(100);
       
       if (error) {
         console.error('useBookings - Query error:', error);
         throw error;
       }
       
-      console.log('useBookings - Fetched bookings count:', data?.length || 0);
-      return data as BookingWithNanny[];
+      // ✅ Validate booking data completeness and log issues
+      const validatedBookings = (data || []).map(booking => {
+        const validation = validateStoredBooking(booking);
+        
+        if (!validation.isValid) {
+          console.error(`❌ Invalid booking ${booking.id}:`, validation.errors);
+        }
+        
+        if (validation.warnings.length > 0) {
+          console.warn(`⚠️ Booking ${booking.id} warnings:`, validation.warnings);
+        }
+        
+        if (validation.missingFields.length > 0) {
+          console.warn(`📋 Booking ${booking.id} missing fields:`, validation.missingFields);
+        }
+        
+        return booking;
+      });
+      
+      console.log('useBookings - Fetched and validated bookings:', validatedBookings.length);
+      return validatedBookings as BookingWithNanny[];
     },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 60 * 1000,
+    staleTime: 1 * 60 * 1000, // Reduced to 1 minute for fresher data
+    refetchInterval: 30 * 1000, // Refresh every 30 seconds
+    refetchOnWindowFocus: true, // Refresh when user returns to window
+    refetchOnReconnect: true, // Refresh when connection restored
   });
 
   console.log('useBookings - Returning bookings count:', bookings?.length || 0);

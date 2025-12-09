@@ -152,6 +152,7 @@ export const createBookingFromPreferences = async (preferences: any, nannyId: st
                      preferences.durationType === 'short_term' ? 'date_day' :
                      preferences.durationType === 'long_term' ? 'long_term' : 'standard';
 
+  // ✅ Enhanced: Build comprehensive booking data with complete metadata for dashboard and calendar
   const bookingData: TablesInsert<'bookings'> = {
     client_id: clientId,
     nanny_id: nannyId,
@@ -164,25 +165,44 @@ export const createBookingFromPreferences = async (preferences: any, nannyId: st
       ? { 
           selectedDates: preferences.selectedDates,
           timeSlots: preferences.timeSlots,
-          bookingType: preferences.bookingSubType 
+          bookingType: preferences.bookingSubType,
+          numberOfDates: preferences.selectedDates?.length || 1,
+          totalHours: pricing.totalHours || 0,
+          // Add calculated time ranges for calendar display
+          defaultStartTime: preferences.timeSlots?.[0]?.start || '09:00',
+          defaultEndTime: preferences.timeSlots?.[0]?.end || '17:00'
         }
-      : preferences.schedule,
+      : {
+          ...preferences.schedule,
+          // For long-term bookings, include standard working hours
+          workingHours: {
+            start: preferences.timeSlots?.[0]?.start || '08:00',
+            end: preferences.timeSlots?.[0]?.end || '17:00'
+          }
+        },
     living_arrangement: preferences.livingArrangement || 'live-out',
     services: {
-      petCare: preferences.petCare,
-      cooking: preferences.cooking,
-      specialNeeds: preferences.specialNeeds,
-      ecdTraining: preferences.ecdTraining,
-      montessori: preferences.montessori,
+      petCare: preferences.petCare || false,
+      cooking: preferences.cooking || false,
+      specialNeeds: preferences.specialNeeds || false,
+      ecdTraining: preferences.ecdTraining || false,
+      montessori: preferences.montessori || false,
+      drivingSupport: preferences.drivingSupport || false,
+      backupNanny: preferences.backupNanny || false,
       durationType: preferences.durationType,
-      bookingSubType: preferences.bookingSubType
+      bookingSubType: preferences.bookingSubType,
+      // Add service details for dashboard display
+      childrenAges: preferences.childrenAges || [],
+      numberOfChildren: countChildren(preferences.childrenAges || []),
+      location: preferences.location || '',
+      languages: preferences.languages || ''
     },
     base_rate: pricing.baseRate,
     additional_services_cost: pricing.addOns.reduce((sum: number, addon: any) => sum + addon.price, 0),
     total_monthly_cost: pricing.total,
     notes: preferences.durationType === 'short_term' 
-      ? `Short-term ${preferences.bookingSubType} booking. ${preferences.bookingSubType === 'date_night' ? `Total hours: ${pricing.totalHours || 0}` : `Total days: ${preferences.selectedDates?.length || 0}`}`
-      : null
+      ? `Short-term ${preferences.bookingSubType} booking. ${preferences.bookingSubType === 'date_night' ? `Total hours: ${pricing.totalHours || 0}` : `Total days: ${preferences.selectedDates?.length || 0}`}. Time: ${preferences.timeSlots?.[0]?.start || '09:00'} - ${preferences.timeSlots?.[0]?.end || '17:00'}`
+      : `Long-term ${preferences.livingArrangement || 'live-out'} arrangement. Working hours: ${preferences.timeSlots?.[0]?.start || '08:00'} - ${preferences.timeSlots?.[0]?.end || '17:00'}`
   };
 
   console.log('📝 Final booking data being inserted:', bookingData);

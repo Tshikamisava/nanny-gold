@@ -12,6 +12,7 @@ import { useAuthContext } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { extractBookingTimeInfo, getBookingTypeLabel } from '@/utils/bookingValidation';
 
 interface CalendarEvent {
   id: string;
@@ -110,7 +111,7 @@ export default function ClientCalendar() {
     };
   }, [user?.id, queryClient, toast]);
 
-  // Get events for a specific date
+  // Get events for a specific date with enhanced data extraction
   const getEventsForDate = (date: Date): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     
@@ -130,23 +131,36 @@ export default function ClientCalendar() {
         const priority = booking.booking_type === 'emergency' ? 'emergency' : 
                         booking.status === 'confirmed' ? 'high' : 'medium';
         
-        // ✅ P5: Extract nanny info from booking.nannies join
+        // ✅ Enhanced: Extract complete nanny info from booking.nannies join
         const nannyProfile = (booking as any).nannies?.profiles;
         const nannyName = nannyProfile 
           ? `${nannyProfile.first_name || ''} ${nannyProfile.last_name || ''}`.trim() || 'Your Nanny'
           : 'Your Nanny';
         const nannyPhone = nannyProfile?.phone || '';
         const nannyRating = (booking as any).nannies?.rating || 0;
+        
+        // ✅ Enhanced: Extract accurate time information using validation utility
+        const timeInfo = extractBookingTimeInfo(booking);
+        const startTime = timeInfo.start;
+        const endTime = timeInfo.end;
+        
+        if (!timeInfo.hasValidTime) {
+          console.warn(`⏰ Booking ${booking.id} using default times - schedule may be incomplete`);
+        }
+        
         const clientLocation = 'Your Home';
         const livingArrangement = booking.living_arrangement ? 
           ` (${booking.living_arrangement === 'live-in' ? 'Live-in' : 'Live-out'})` : '';
         
+        // ✅ Enhanced: Use validation utility for consistent event titles
+        const eventTitle = getBookingTypeLabel(booking.booking_type, booking.living_arrangement);
+        
         events.push({
           id: booking.id,
           type: 'booking',
-          startTime: '09:00',
-          endTime: '17:00',
-          title: `Childcare Session${livingArrangement}`,
+          startTime: startTime,
+          endTime: endTime,
+          title: eventTitle,
           status: booking.status,
           nanny: nannyName,
           location: clientLocation,

@@ -83,7 +83,11 @@ export function NannySidebar() {
                       <NavLink 
                         to={item.url} 
                         end={item.exact}
-                        className="flex items-center w-full"
+                        className={`flex items-center w-full rounded-lg transition-all ${
+                          active 
+                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                        }`}
                         onClick={handleNavClick}
                       >
                         <item.icon className="mr-2 h-4 w-4" />
@@ -108,7 +112,11 @@ export function NannySidebar() {
                     <SidebarMenuButton asChild isActive={active}>
                       <NavLink 
                         to={item.url}
-                        className="flex items-center w-full"
+                        className={`flex items-center w-full rounded-lg transition-all ${
+                          active 
+                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                        }`}
                         onClick={handleNavClick}
                       >
                         <item.icon className="mr-2 h-4 w-4" />
