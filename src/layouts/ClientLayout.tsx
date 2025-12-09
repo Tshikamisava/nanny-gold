@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Footer } from '@/components/Footer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,8 @@ import {
 export const ClientLayout = () => {
   const { signOut, user } = useAuthContext();
   const navigate = useNavigate();
+  const { data: notifications } = useNotifications();
+  const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   const handleSignOut = async () => {
     try {
@@ -57,14 +60,18 @@ export const ClientLayout = () => {
             </div>
             <div className="flex items-center gap-2">
               {/* Chat Icon */}
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" onClick={() => navigate('/dashboard/messages')}>
                 <MessageCircle className="h-5 w-5" />
               </Button>
               
               {/* Notification Bell */}
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" onClick={() => navigate('/client/notifications-inbox')}>
                 <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">3</Badge>
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                    {unreadCount}
+                  </Badge>
+                )}
               </Button>
               
               {/* Profile Avatar with Dropdown */}

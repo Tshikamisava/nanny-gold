@@ -253,9 +253,9 @@ export default function NannyDashboard() {
             <Coins className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">R{stats.totalEarnings.toFixed(2)}</div>
+            <div className="text-lg md:text-2xl font-bold text-green-600">R{stats.totalEarnings.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              After admin commission
+              After platform commission (10-25%)
             </p>
           </CardContent>
         </Card>

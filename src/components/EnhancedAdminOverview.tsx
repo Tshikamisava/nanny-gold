@@ -210,22 +210,30 @@ export function EnhancedAdminOverview({ className }: Props) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base sm:text-lg">Revenue Breakdown</CardTitle>
-            <CardDescription>Revenue sources analysis</CardDescription>
+            <CardDescription>Platform revenue split</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm">Placement Fees</span>
-              <span className="font-semibold">{formatCurrency(revenueBreakdown.placementFees)}</span>
+              <span className="text-sm text-muted-foreground">Placement Fees</span>
+              <span className="font-semibold text-sm">{formatCurrency(revenueBreakdown.placementFees)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">Commission</span>
-              <span className="font-semibold">{formatCurrency(revenueBreakdown.commissionRevenue)}</span>
+              <span className="text-sm text-muted-foreground">Monthly Commission</span>
+              <span className="font-semibold text-sm">{formatCurrency(revenueBreakdown.commissionRevenue)}</span>
             </div>
             <div className="h-px bg-border my-2"></div>
-            <div className="flex items-center justify-between font-semibold">
-              <span>Total Revenue</span>
-              <span>{formatCurrency(revenueBreakdown.totalRevenue)}</span>
+            <div className="flex items-center justify-between font-semibold text-primary">
+              <span className="text-sm">Admin Total Revenue</span>
+              <span className="text-base">{formatCurrency(revenueBreakdown.totalRevenue)}</span>
             </div>
+            <div className="h-px bg-border my-2"></div>
+            <div className="flex items-center justify-between font-semibold text-green-600">
+              <span className="text-sm">Nanny Total Earnings</span>
+              <span className="text-base">{formatCurrency(nannyStats.totalEarnings)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Commission: 10-25% sliding scale
+            </p>
           </CardContent>
         </Card>
 

@@ -20,6 +20,8 @@ import {
 export const AdminLayout = () => {
   const { signOut, user } = useAuthContext();
   const navigate = useNavigate();
+  const { data: notifications } = useNotifications();
+  const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   const handleSignOut = async () => {
     await signOut();
@@ -50,9 +52,13 @@ export const AdminLayout = () => {
               </Button>
               
               {/* Notification Bell */}
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" onClick={() => navigate('/admin/notifications-inbox')}>
                 <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">5</Badge>
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                    {unreadCount}
+                  </Badge>
+                )}
               </Button>
               
               {/* Profile Avatar with Dropdown */}

@@ -12,9 +12,13 @@ export const useNotifications = () => {
   const query = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -29,7 +33,7 @@ export const useNotifications = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications'
         },
@@ -63,6 +67,31 @@ export const useMarkNotificationRead = () => {
       return data;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    }
+  });
+};
+
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      // Optimistically update the cache
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old) return old;
+        return old.filter((notification: any) => notification.id !== deletedId);
+      });
+      // Then invalidate to refetch
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     }
   });
