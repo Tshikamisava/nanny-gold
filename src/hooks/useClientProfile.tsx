@@ -18,21 +18,63 @@ export const useClientProfile = () => {
     queryFn: async () => {
       console.log('🔍 useClientProfile: Fetching profile for user:', user?.id);
       if (!user?.id) throw new Error('User not authenticated');
+      
+      // Try to load from database (will use cache as fallback on network errors)
       const result = await loadClientProfile(user.id);
       console.log('📦 useClientProfile: Loaded profile data:', result);
+      
+      // If result is null, try to get from localStorage cache
+      if (!result) {
+        try {
+          const cached = localStorage.getItem(`client-profile-${user.id}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.data && parsed.timestamp) {
+              // Use cached data if it's less than 24 hours old
+              if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+                console.log('📦 useClientProfile: Using cached profile data');
+                return parsed.data;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ useClientProfile: Error reading cache:', e);
+        }
+      }
+      
       return result;
     },
     enabled: !!user?.id,
-    // PHASE 1: Force fresh data on every load - no stale cache
-    staleTime: 0, // Always fetch fresh data from database
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes for quick re-access
+    // Use cached data as initial data, but still fetch fresh
+    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    gcTime: 24 * 60 * 60 * 1000, // Keep in cache for 24 hours
     refetchOnWindowFocus: true, // Refetch when user returns to window
-    refetchOnMount: 'always', // Always refetch on mount to ensure fresh data after login
+    refetchOnMount: true, // Refetch on mount but use cache as initial data
     retry: (failureCount, error) => {
       console.log('❌ useClientProfile: Query failed, attempt:', failureCount + 1, 'Error:', error);
       // Don't retry on authentication errors
       if (error.message?.includes('not authenticated')) return false;
-      return failureCount < 2;
+      // Retry network errors up to 2 times
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        return failureCount < 2;
+      }
+      return false;
+    },
+    // Use cached data as placeholder while fetching
+    placeholderData: () => {
+      if (!user?.id) return undefined;
+      try {
+        const cached = localStorage.getItem(`client-profile-${user.id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.data && parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+            return parsed.data;
+          }
+        }
+      } catch (e) {
+        // Ignore cache errors
+      }
+      return undefined;
     }
   });
 

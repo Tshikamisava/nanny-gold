@@ -4,12 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { useBooking } from "@/contexts/BookingContext";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Loader2, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, getBookingTypeRate, isHourlyBasedBooking, isDailyBasedBooking, calculateHourlyPricing, calculateDailyPricing, type HourlyPricingResult } from "@/utils/pricingUtils";
 import { PlacementFeeDialog } from "@/components/PlacementFeeDialog";
 import { extractBookingDetails, cleanPreferences } from "@/utils/valueUtils";
+import { calculateAndStoreBookingFinancials } from "@/services/bookingService";
 const PaymentScreen = () => {
   const navigate = useNavigate();
   const {
@@ -31,11 +32,15 @@ const PaymentScreen = () => {
   } = useBooking();
 
   // Extract booking details safely without creating circular references
-  const { bookingSubType, durationType, selectedDates, timeSlots } = extractBookingDetails(preferences);
+  const {
+    bookingSubType,
+    durationType,
+    selectedDates,
+    timeSlots
+  } = useMemo(() => extractBookingDetails(preferences), [preferences]);
 
   // Clean preferences for calculations
-  const cleanedPreferences = cleanPreferences(preferences);
-
+  const cleanedPreferences = useMemo(() => cleanPreferences(preferences), [preferences]);
 
   // Check booking type with cleaned preferences
   const isHourlyBooking = cleanedPreferences?.bookingSubType && isHourlyBasedBooking(cleanedPreferences.bookingSubType);
@@ -82,6 +87,92 @@ const PaymentScreen = () => {
     return false;
   })();
 
+  const hourlyServices = useMemo(() => ({
+    cooking: cleanedPreferences?.cooking || false,
+    specialNeeds: cleanedPreferences?.specialNeeds || false,
+    drivingSupport: cleanedPreferences?.drivingSupport || false,
+    lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
+  }), [
+    cleanedPreferences?.cooking,
+    cleanedPreferences?.specialNeeds,
+    cleanedPreferences?.drivingSupport,
+    Array.isArray(cleanedPreferences?.householdSupport)
+      ? cleanedPreferences?.householdSupport.join(',')
+      : cleanedPreferences?.householdSupport
+  ]);
+
+  const limitedSelectedDates = useMemo(() => {
+    if (!selectedDates || !Array.isArray(selectedDates)) return [];
+    return selectedDates.slice(0, 30);
+  }, [selectedDates]);
+
+  const totalHours = useMemo(() => {
+    if (!bookingSubType) {
+      return 0;
+    }
+
+    const calculateSlotHours = () => {
+      if (!timeSlots || timeSlots.length === 0) return 0;
+      return timeSlots.reduce((total: number, slot: any) => {
+        const start = new Date(`2000-01-01T${slot.start}:00`);
+        const end = new Date(`2000-01-01T${slot.end}:00`);
+        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        return total + Math.max(hours, 0);
+      }, 0);
+    };
+
+    if (bookingSubType === 'date_night') {
+      const baseHours = calculateSlotHours();
+      if (baseHours > 0 && selectedDates) {
+        return baseHours * Math.min(selectedDates.length, 10);
+      }
+      return Math.min(selectedDates ? selectedDates.length : 1, 10) * 4;
+    }
+
+    if (bookingSubType === 'date_day') {
+      const baseHours = calculateSlotHours();
+      if (baseHours > 0 && selectedDates) {
+        return baseHours * Math.min(selectedDates.length, 30);
+      }
+      const validDates = Math.min(selectedDates ? selectedDates.length : 1, 30);
+      return validDates * 8;
+    }
+
+    if (bookingSubType === 'emergency') {
+      const baseHours = calculateSlotHours();
+      if (baseHours > 0 && selectedDates) {
+        return Math.max(5, baseHours * Math.min(selectedDates.length, 3));
+      }
+      const validDates = Math.min(selectedDates ? selectedDates.length : 1, 3);
+      return Math.max(5, validDates * 5);
+    }
+
+    if (bookingSubType === 'school_holiday') {
+      const baseHours = calculateSlotHours();
+      if (baseHours > 0 && selectedDates) {
+        return baseHours * Math.min(selectedDates.length, 15);
+      }
+      const validDates = Math.min(selectedDates ? selectedDates.length : 1, 15);
+      return validDates * 6;
+    }
+
+    return calculateSlotHours();
+  }, [bookingSubType, timeSlots, selectedDates]);
+
+  const hourlyPricingKey = useMemo(() => {
+    if (!isHourlyBooking || !bookingSubType) return null;
+    return JSON.stringify({
+      bookingSubType,
+      totalHours,
+      services: hourlyServices,
+      selectedDates: limitedSelectedDates,
+      homeSize: cleanedPreferences?.homeSize
+    });
+  }, [isHourlyBooking, bookingSubType, totalHours, hourlyServices, limitedSelectedDates, cleanedPreferences?.homeSize]);
+
+  const lastHourlyKeyRef = useRef<string | null>(null);
+
+
   console.log('🔍 Booking type classification:', {
     durationType: cleanedPreferences?.durationType,
     bookingSubType: cleanedPreferences?.bookingSubType,
@@ -93,106 +184,115 @@ const PaymentScreen = () => {
   });
 
   // Calculate pricing based on booking type
+  // Calculate payable amount directly from the pricing objects displayed on screen
+  // This ensures we use the exact same values shown on the "Pay R..." button
+  const calculatePayableAmount = (): number => {
+    // Long-term: placement fee is what's due today
+    if (isLongTermBooking && monthlyPricing) {
+      return placementFee;
+    }
+
+    // Short-term hourly: total from hourlyPricing
+    if (isHourlyBooking && hourlyPricing && hourlyPricing.total > 0) {
+      return hourlyPricing.total;
+    }
+
+    // Short-term daily: total from dailyPricing
+    if (isDailyBooking && dailyPricing && dailyPricing.total > 0) {
+      return dailyPricing.total;
+    }
+
+    // Fallback: should never reach here if pricing is loaded
+    console.warn('⚠️ No pricing available for amount calculation');
+    return 0;
+  };
+
+  const buildPricingPayload = () => {
+    if (isLongTermBooking && monthlyPricing) {
+      return {
+        type: 'monthly' as const,
+        baseRate: monthlyPricing.baseRate,
+        addOns: monthlyPricing.addOns,
+        total: monthlyPricing.total,
+        breakdown: monthlyPricing,
+        placementFee: placementFee
+      };
+    }
+
+    if (isHourlyBooking && hourlyPricing) {
+      return {
+        type: 'hourly' as const,
+        baseRate: hourlyPricing.baseHourlyRate,
+        addOns: hourlyPricing.services || [],
+        total: hourlyPricing.total,
+        totalHours: totalHours,
+        breakdown: hourlyPricing
+      };
+    }
+
+    if (isDailyBooking && dailyPricing) {
+      return {
+        type: 'daily' as const,
+        baseRate: dailyPricing.total / (dailyPricing.breakdown?.length || 1),
+        addOns: [],
+        total: dailyPricing.total,
+        breakdown: dailyPricing
+      };
+    }
+
+    return null;
+  };
+
   useEffect(() => {
+    if (!hourlyPricingKey) {
+      if (isHourlyBooking) {
+        setHourlyPricing(null);
+      }
+      setIsPricingLoading(false);
+      return;
+    }
+
+    if (hourlyPricing && lastHourlyKeyRef.current === hourlyPricingKey) {
+      setIsPricingLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsPricingLoading(true);
+
     const fetchHourlyPricing = async () => {
-      if (isHourlyBooking && bookingSubType) {
-        setIsPricingLoading(true);
-        try {
-          console.log('🔍 Calculating hourly pricing with:', {
-            bookingSubType,
-            selectedDatesCount: selectedDates?.length || 0,
-            timeSlotsCount: timeSlots?.length || 0,
-            preferences: { cooking: cleanedPreferences?.cooking, specialNeeds: cleanedPreferences?.specialNeeds, drivingSupport: cleanedPreferences?.drivingSupport }
-          });
+      try {
+        const pricing = await calculateHourlyPricing(
+          bookingSubType as 'emergency' | 'date_night' | 'date_day' | 'school_holiday', 
+          totalHours,
+          hourlyServices,
+          limitedSelectedDates,
+          cleanedPreferences?.homeSize
+        );
 
-          // Calculate total hours based on booking type
-          let totalHours = 0;
-          if (bookingSubType === 'date_night') {
-            // Date night: multiply time slot hours by number of dates
-            if (timeSlots && timeSlots.length > 0 && selectedDates) {
-              totalHours = timeSlots.reduce((total: number, slot: any) => {
-                const start = new Date(`2000-01-01T${slot.start}:00`);
-                const end = new Date(`2000-01-01T${slot.end}:00`);
-                const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                return total + hours;
-              }, 0) * Math.min(selectedDates.length, 10); // Max 10 date nights
-            } else {
-              // Fallback: 4 hours per date night (standard evening)
-              totalHours = Math.min(selectedDates ? selectedDates.length : 1, 10) * 4;
-            }
-          } else if (bookingSubType === 'date_day') {
-            // Date day: multiply time slot hours by number of days
-            if (timeSlots && timeSlots.length > 0 && selectedDates) {
-              const dailyHours = timeSlots.reduce((total: number, slot: any) => {
-                const start = new Date(`2000-01-01T${slot.start}:00`);
-                const end = new Date(`2000-01-01T${slot.end}:00`);
-                const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                return total + hours;
-              }, 0);
-              // Limit to reasonable number of days (max 30 days for date_day bookings)
-              const validDates = Math.min(selectedDates.length, 30);
-              totalHours = dailyHours * validDates;
-            } else {
-              // Fallback: 8 hours per selected date (standard day), max 30 days
-              const validDates = Math.min(selectedDates ? selectedDates.length : 1, 30);
-              totalHours = validDates * 8;
-            }
-          } else if (bookingSubType === 'emergency') {
-            // Emergency: multiply time slot hours by number of dates, minimum 5 hours total
-            if (timeSlots && timeSlots.length > 0 && selectedDates) {
-              const slotHours = timeSlots.reduce((total: number, slot: any) => {
-                const start = new Date(`2000-01-01T${slot.start}:00`);
-                const end = new Date(`2000-01-01T${slot.end}:00`);
-                const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                return total + hours;
-              }, 0);
-              // Limit to max 3 emergency dates
-              totalHours = Math.max(5, slotHours * Math.min(selectedDates.length, 3));
-            } else {
-              // Fallback: minimum 5 hours for emergency, max 3 dates
-              totalHours = Math.max(5, Math.min(selectedDates ? selectedDates.length : 1, 3) * 5);
-            }
-          }
-
-          console.log('📊 Calculated total hours:', totalHours);
-
-          // Use actual selected services from preferences
-          const services = {
-            cooking: cleanedPreferences?.cooking || false,
-            specialNeeds: cleanedPreferences?.specialNeeds || false,
-            drivingSupport: cleanedPreferences?.drivingSupport || false,
-            lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
-          };
-          
-          console.log('🧹 Light Housekeeping Check:', {
-            householdSupport: cleanedPreferences?.householdSupport,
-            lightHousekeeping: services.lightHousekeeping,
-            homeSize: cleanedPreferences?.homeSize
-          });
-          
-          // Limit selected dates to reasonable amounts to prevent API issues
-          const limitedDates = selectedDates ? selectedDates.slice(0, 30) : [];
-          
-          const pricing = await calculateHourlyPricing(
-            bookingSubType as 'emergency' | 'date_night' | 'date_day', 
-            totalHours, 
-            services, 
-            limitedDates,
-            cleanedPreferences?.homeSize
-          );
+        if (isActive) {
           setHourlyPricing(pricing);
-          setIsPricingLoading(false);
-        } catch (error) {
-          console.error('⚠️ Pricing calculation error:', error);
-          setIsPricingLoading(false);
-          // Handle pricing calculation error silently
+          lastHourlyKeyRef.current = hourlyPricingKey;
         }
-      } else {
-        setIsPricingLoading(false);
+      } catch (error) {
+        if (isActive) {
+          console.error('⚠️ Pricing calculation error:', error);
+          lastHourlyKeyRef.current = null;
+          setHourlyPricing(null);
+        }
+      } finally {
+        if (isActive) {
+          setIsPricingLoading(false);
+        }
       }
     };
+
     fetchHourlyPricing();
-  }, [isHourlyBooking, bookingSubType, timeSlots, selectedDates, cleanedPreferences?.cooking, cleanedPreferences?.specialNeeds, cleanedPreferences?.drivingSupport, JSON.stringify(cleanedPreferences?.householdSupport), cleanedPreferences?.homeSize]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [hourlyPricingKey, isHourlyBooking, bookingSubType, totalHours, hourlyServices, limitedSelectedDates, cleanedPreferences?.homeSize, hourlyPricing]);
 
   // Calculate pricing based on booking type and user selections
   const pricing = isLongTermBooking ? calculateNannySpecificPricing(selectedNanny) : null;
@@ -234,11 +334,26 @@ const PaymentScreen = () => {
     : 0;
 
   // Calculate daily pricing for temporary support
-  const dailyPricing = isDailyBooking && selectedDates ? calculateDailyPricing(selectedDates, bookingSubType!, preferences.homeSize, { 
-    cooking: cleanedPreferences?.cooking, 
-    specialNeeds: cleanedPreferences?.specialNeeds, 
-    drivingSupport: cleanedPreferences?.drivingSupport
-  }) : null;
+  const dailyPricing = useMemo(() => {
+    if (!isDailyBooking || !selectedDates || !bookingSubType) {
+      return null;
+    }
+    return calculateDailyPricing(selectedDates, bookingSubType, preferences.homeSize, { 
+      cooking: cleanedPreferences?.cooking, 
+      specialNeeds: cleanedPreferences?.specialNeeds, 
+      drivingSupport: cleanedPreferences?.drivingSupport
+    });
+  }, [
+    isDailyBooking,
+    selectedDates,
+    bookingSubType,
+    preferences.homeSize,
+    cleanedPreferences?.cooking,
+    cleanedPreferences?.specialNeeds,
+    cleanedPreferences?.drivingSupport
+  ]);
+  const isHourlyPricingPending = isPricingLoading && !hourlyPricing;
+  const isDailyPricingPending = isPricingLoading && !dailyPricing;
   
   const selectedNannyName = selectedNanny?.profiles ? `${selectedNanny.profiles.first_name} ${selectedNanny.profiles.last_name}` : 'Selected Nanny';
   // Removed card processing - payment now goes directly to EFT
@@ -382,20 +497,21 @@ const PaymentScreen = () => {
 
       if (existingBookings && existingBookings.length > 0) {
         console.log('✅ Found existing pending booking, redirecting to EFT payment');
-        const pricingData = isLongTermBooking && monthlyPricing ? {
-          type: 'monthly',
-          baseRate: monthlyPricing.baseRate,
-          addOns: monthlyPricing.addOns,
-          total: monthlyPricing.total,
-          breakdown: monthlyPricing,
-          placementFee: placementFee
-        } : null;
-
+        const pricingData = buildPricingPayload();
+        const amountDue = calculatePayableAmount();
+        console.log('💰 Existing booking - Amount due:', amountDue, {
+          isLongTermBooking,
+          isHourlyBooking,
+          isDailyBooking,
+          hourlyPricing: hourlyPricing?.total,
+          dailyPricing: dailyPricing?.total,
+          placementFee
+        });
         navigate('/eft-payment', { 
           state: { 
             bookingId: existingBookings[0].id,
             pricingData,
-            amount: pricingData?.total, // Explicit amount for EFT screen
+            amount: amountDue,
             nannyName: selectedNannyName,
             bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
           }
@@ -417,50 +533,63 @@ const PaymentScreen = () => {
 
       console.log('✅ Booking created:', booking.id);
 
+      try {
+        const amountForFinancials = isLongTermBooking && monthlyPricing
+          ? monthlyPricing.total
+          : isHourlyBooking && hourlyPricing
+            ? hourlyPricing.total
+            : isDailyBooking && dailyPricing
+              ? dailyPricing.total
+              : 0;
+
+        const bookingTypeForFinancials = isLongTermBooking
+          ? 'long_term'
+          : isHourlyBooking
+            ? 'short_term_hourly'
+            : 'short_term_daily';
+
+        if (amountForFinancials > 0) {
+          await calculateAndStoreBookingFinancials(
+            booking.id,
+            amountForFinancials,
+            bookingTypeForFinancials,
+            isLongTermBooking ? monthlyPricing?.total : amountForFinancials
+          );
+        }
+      } catch (financialError) {
+        console.error('Error preparing booking financials:', financialError);
+      }
+
       // Pass comprehensive pricing data to EFT screen with booking ID
-      const pricingData = isLongTermBooking && monthlyPricing ? {
-        type: 'monthly',
-        baseRate: monthlyPricing.baseRate,
-        addOns: monthlyPricing.addOns,
-        total: monthlyPricing.total,
-        breakdown: monthlyPricing,
-        placementFee: placementFee
-      } : isHourlyBooking && hourlyPricing ? {
-        type: 'hourly', 
-        baseRate: hourlyPricing.baseHourlyRate,
-        addOns: hourlyPricing.services || [],
-        total: hourlyPricing.total,
-        totalHours: 0,
-        breakdown: hourlyPricing
-      } : isDailyBooking && dailyPricing ? {
-        type: 'daily',
-        baseRate: dailyPricing.total / (dailyPricing.breakdown?.length || 1),
-        addOns: [], 
-        total: dailyPricing.total,
-        breakdown: dailyPricing
-      } : null;
+      const pricingData = buildPricingPayload();
+      const amountDue = calculatePayableAmount();
 
       console.log('💰 Pre-navigation pricing check:', {
         isHourlyBooking,
-        hourlyPricing,
+        hourlyPricing: hourlyPricing?.total,
         isDailyBooking, 
-        dailyPricing,
+        dailyPricing: dailyPricing?.total,
+        isLongTermBooking,
+        monthlyPricing: monthlyPricing?.total,
+        placementFee,
+        amountDue,
         pricingDataTotal: pricingData?.total,
-        willPassAmount: pricingData?.total
+        pricingDataPlacementFee: pricingData?.placementFee
       });
 
       console.log('💰 Navigating to EFT with pricing:', {
         pricingData,
-        amount: pricingData?.total,
+        amount: amountDue,
         bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
       });
 
       // Redirect to EFT payment screen with booking ID and explicit amount
+      // CRITICAL: amountDue is calculated directly from the pricing objects shown on screen
       navigate('/eft-payment', { 
         state: { 
           bookingId: booking.id,
           pricingData,
-          amount: pricingData?.total, // Explicit amount for EFT screen
+          amount: amountDue, // This is the exact amount shown on the "Pay R..." button
           nannyName: selectedNannyName,
           bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
         }
@@ -627,11 +756,11 @@ const PaymentScreen = () => {
                 
                 
 
-                <Button onClick={handlePayment} disabled={isProcessing || isPricingLoading} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
+                <Button onClick={handlePayment} disabled={isProcessing || isHourlyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
                   {isProcessing ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Processing...
-                    </> : isPricingLoading ? <>
+                    </> : isHourlyPricingPending ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Calculating pricing...
                     </> : `Pay R${hourlyPricing.total.toLocaleString()}`}
@@ -668,14 +797,14 @@ const PaymentScreen = () => {
                   
                   
 
-                  <Button onClick={handlePayment} disabled={isProcessing || isPricingLoading} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
+                  <Button onClick={handlePayment} disabled={isProcessing || isDailyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
                     {isProcessing ? <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                         Processing...
-                      </> : isPricingLoading ? <>
+                      </> : isDailyPricingPending ? <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                         Calculating pricing...
-                      </> : `Pay (R${dailyPricing.total.toLocaleString()})`}
+                      </> : `Pay R${dailyPricing.total.toLocaleString()}`}
                   </Button>
                 </div>
               </> : !isHourlyBooking && !isDailyBooking && monthlyPricing ?

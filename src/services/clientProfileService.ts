@@ -150,6 +150,44 @@ export const saveClientProfile = async (
     console.log('✅ Profile saved successfully via transaction');
     console.log('📊 Saved data:', data.savedData);
     
+    // Cache the saved profile data
+    if (data.savedData) {
+      // Reconstruct profile data from saved data for caching
+      const profileToCache: ClientProfileData = {
+        location: cleanedData.location,
+        streetAddress: cleanedData.streetAddress,
+        estateInfo: cleanedData.estateInfo,
+        suburb: cleanedData.suburb,
+        city: cleanedData.city,
+        province: cleanedData.province,
+        postalCode: cleanedData.postalCode,
+        firstName: cleanedData.firstName,
+        lastName: cleanedData.lastName,
+        phone: cleanedData.phone,
+        numberOfChildren: cleanedData.numberOfChildren,
+        childrenAges: cleanedData.childrenAges,
+        otherDependents: cleanedData.otherDependents,
+        petsInHome: cleanedData.petsInHome,
+        homeSize: cleanedData.homeSize,
+        specialNeeds: cleanedData.specialNeeds,
+        ecdTraining: cleanedData.ecdTraining,
+        drivingSupport: cleanedData.drivingSupport,
+        cooking: cleanedData.cooking,
+        lightHouseKeeping: cleanedData.lightHouseKeeping,
+        errandRuns: cleanedData.errandRuns,
+        languages: cleanedData.languages,
+        montessori: cleanedData.montessori,
+        schedule: cleanedData.schedule,
+        backupNanny: cleanedData.backupNanny,
+        livingArrangement: cleanedData.livingArrangement,
+        durationType: cleanedData.durationType,
+        bookingSubType: cleanedData.bookingSubType,
+        selectedDates: cleanedData.selectedDates,
+        timeSlots: cleanedData.timeSlots,
+      };
+      cacheProfile(userId, profileToCache);
+    }
+    
     return { 
       success: true,
       savedData: data.savedData
@@ -171,7 +209,46 @@ export const saveClientProfile = async (
   }
 };
 
+// Helper to get cached profile from localStorage
+const getCachedProfile = (userId: string): ClientProfileData | null => {
+  try {
+    const cached = localStorage.getItem(`client-profile-${userId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      // Check if cache is still valid (24 hours)
+      if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+        console.log('📦 Using cached profile data from localStorage');
+        return parsed.data;
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Error reading cached profile:', e);
+  }
+  return null;
+};
+
+// Helper to save profile to localStorage
+const cacheProfile = (userId: string, profileData: ClientProfileData | null) => {
+  try {
+    if (profileData) {
+      localStorage.setItem(`client-profile-${userId}`, JSON.stringify({
+        data: profileData,
+        timestamp: Date.now()
+      }));
+      console.log('💾 Profile cached to localStorage');
+    } else {
+      // Don't cache null - keep existing cache if available
+      console.log('⚠️ Not caching null profile, keeping existing cache if available');
+    }
+  } catch (e) {
+    console.warn('⚠️ Error caching profile to localStorage:', e);
+  }
+};
+
 export const loadClientProfile = async (userId: string): Promise<ClientProfileData | null> => {
+  // Try to load from cache first for immediate response
+  const cachedProfile = getCachedProfile(userId);
+  
   try {
     // Load basic client info
     const { data: clientData, error: clientError } = await supabase
@@ -180,7 +257,15 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
       .eq('id', userId)
       .maybeSingle();
 
-    if (clientError) throw clientError;
+    if (clientError) {
+      console.warn('⚠️ Error loading clients table:', clientError);
+      // If we have cached data, use it instead of failing
+      if (cachedProfile) {
+        console.log('🔄 Using cached profile due to clients table error');
+        return cachedProfile;
+      }
+      throw clientError;
+    }
 
     // Load profile data including personal info
     const { data: profileData, error: profileError } = await supabase
@@ -189,7 +274,15 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
       .eq('id', userId)
       .maybeSingle();
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.warn('⚠️ Error loading profiles table:', profileError);
+      // If we have cached data, use it instead of failing
+      if (cachedProfile) {
+        console.log('🔄 Using cached profile due to profiles table error');
+        return cachedProfile;
+      }
+      throw profileError;
+    }
 
     // Load client preferences
     console.log('🔍 Loading preferences for user:', userId);
@@ -199,7 +292,15 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
       .eq('client_id', userId)
       .maybeSingle();
 
-    if (preferencesError) throw preferencesError;
+    if (preferencesError) {
+      console.warn('⚠️ Error loading client_preferences table:', preferencesError);
+      // If we have cached data, use it instead of failing
+      if (cachedProfile) {
+        console.log('🔄 Using cached profile due to preferences table error');
+        return cachedProfile;
+      }
+      throw preferencesError;
+    }
 
     // FIXED: Only return null if we have absolutely no data from any table
     // This prevents the profile from disappearing if one table has no data
@@ -270,7 +371,7 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
     
     console.log('📍 Final parsed location:', parsedLocation);
     
-    return {
+    const profileResult: ClientProfileData = {
       location: location,
       streetAddress: parsedLocation.streetAddress,
       estateInfo: parsedLocation.estateInfo,
@@ -318,8 +419,24 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
       selectedDates: preferencesData?.selected_dates || [],
       timeSlots: (preferencesData?.time_slots as Array<{ start: string; end: string }>) || [],
     };
-  } catch (error) {
-    console.error('Error loading client profile:', error);
+
+    // Cache the successfully loaded profile
+    cacheProfile(userId, profileResult);
+    
+    return profileResult;
+  } catch (error: any) {
+    console.error('❌ Error loading client profile:', error);
+    
+    // On network errors, return cached data if available
+    if (error?.message?.includes('fetch') || error?.message?.includes('network') || error?.code === 'ERR_NETWORK' || error?.message?.includes('Failed to fetch')) {
+      console.warn('⚠️ Network error detected, attempting to use cached profile');
+      if (cachedProfile) {
+        console.log('✅ Using cached profile due to network error');
+        return cachedProfile;
+      }
+    }
+    
+    // If no cache available, return null
     return null;
   }
 };

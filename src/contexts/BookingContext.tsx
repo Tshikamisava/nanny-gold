@@ -693,10 +693,9 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
       const booking = await createBookingFromPreferences(bookingPreferences, nannyId, user.id);
       console.log('✅ Booking created successfully:', booking);
       
-      toast({
-        title: "Booking created",
-        description: "Your booking has been created successfully!"
-      });
+      // NOTE: Do not show "Booking created" toast here for EFT payments
+      // The toast should only appear after proof of payment is uploaded
+      // This prevents showing the notification prematurely before payment proof is submitted
       
       return booking;
     } catch (error) {
