@@ -14,7 +14,7 @@ export const SERVICE_PRICING: Record<string, ServicePriceConfig> = {
   cooking: {
     id: 'cooking',
     name: 'Cooking/Food Prep',
-    price: 1500, // R1,500/month
+    price: 1500, // R1,500/month (updated)
     description: 'Meal preparation and cooking'
   },
   backup_nanny: {
@@ -26,13 +26,13 @@ export const SERVICE_PRICING: Record<string, ServicePriceConfig> = {
   driving_support: {
     id: 'driving_support',
     name: 'Driving Support',
-    price: 1800, // R1,800/month
+    price: 1500, // R1,500/month (updated)
     description: 'Transportation assistance'
   },
   special_needs: {
     id: 'special_needs',
     name: 'Diverse Ability Support',
-    price: 2000, // R2,000/month
+    price: 1500, // R1,500/month (updated)
     description: 'Specialized care for children or other dependants with diverse abilities'
   },
   ecd_training: {

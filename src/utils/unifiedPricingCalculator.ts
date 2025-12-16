@@ -230,13 +230,13 @@ export class UnifiedPricingCalculator {
     
     const mappedSize = homeSize.toLowerCase().replace(/[- ]/g, '_');
     
-    // Flat R2,500 for standard homes and Grand Estate
-    if (['pocket_palace', 'family_hub', 'grand_estate'].includes(mappedSize)) {
+    // Flat R2,500 for standard homes (Pocket Palace, Family Hub)
+    if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
       return 2500;
     }
     
-    // 50% for premium estates only
-    if (mappedSize === 'monumental_manor' || mappedSize === 'epic_estates') {
+    // 50% for premium estates (Grand Estate, Monumental Manor, Epic Estates)
+    if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
       return Math.round(baseRate * 0.5);
     }
     

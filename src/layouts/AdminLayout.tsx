@@ -8,6 +8,7 @@ import { LogOut, MessageCircle, Bell, User, Settings } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   DropdownMenu,
   DropdownMenuContent,

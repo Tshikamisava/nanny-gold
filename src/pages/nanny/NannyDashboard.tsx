@@ -8,6 +8,7 @@ import { useAuthContext } from '@/components/AuthProvider';
 import { Calendar, Coins, Star, Clock, MapPin, Users } from 'lucide-react';
 import { SmartChatWidget } from '@/components/SmartChatWidget';
 import { useToast } from '@/hooks/use-toast';
+import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
 
 interface NannyStats {
   totalBookings: number;
@@ -379,6 +380,25 @@ export default function NannyDashboard() {
                         )}
                       </div>
                     </div>
+                    
+                    {/* Revenue Transparency Display */}
+                    {hasFinancials && (
+                      <div className="mt-3">
+                        <BookingRevenueDisplay
+                          bookingType={booking.booking_type}
+                          totalCost={booking.booking_financials[0]?.total_cost}
+                          baseRate={booking.base_rate}
+                          additionalServices={booking.additional_services_cost}
+                          placementFee={booking.booking_financials[0]?.placement_fee}
+                          commissionPercent={booking.booking_financials[0]?.commission_rate}
+                          commissionAmount={booking.booking_financials[0]?.commission_amount}
+                          nannyEarnings={nannyEarnings}
+                          adminRevenue={booking.booking_financials[0]?.admin_revenue}
+                          homeSize={homeSize}
+                          userRole="nanny"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })

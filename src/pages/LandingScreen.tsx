@@ -16,7 +16,7 @@ const LandingScreen = () => {
           <p className="text-gray-600 text-lg">Premium child and home care at your fingertips</p>
           
           <div className="space-y-4 w-full max-w-sm">
-            <Button onClick={() => navigate('/signup')} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
+            <Button onClick={() => navigate('/enhanced-signup')} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
               Get Started
             </Button>
             

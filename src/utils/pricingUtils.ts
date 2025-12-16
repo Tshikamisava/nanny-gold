@@ -68,11 +68,11 @@ export const calculateLongTermPricing = (
     drivingRequired?: boolean;
   } = {}
 ): LongTermPricingResult => {
-  // Base rates by home size - UPDATED with all 5 tiers
+  // Updated base rates by home size - NEW PRICING STRUCTURE
   const homeSizeRates: { [key: string]: { live_in: number; live_out: number } } = {
-    'pocket_palace': { live_in: 5000, live_out: 6000 },        // <120m2, cosy 2 bedrooms
-    'family_hub': { live_in: 6000, live_out: 7000 },           // 120-200m2, comfortable 3 bedrooms
-    'grand_estate': { live_in: 7000, live_out: 8000 },         // 200-300m2, spacious 4 bedrooms
+    'pocket_palace': { live_in: 4500, live_out: 4800 },        // <120m2, cosy 2 bedrooms
+    'family_hub': { live_in: 6000, live_out: 6800 },           // 120-250m2, comfortable 3-4 bedrooms
+    'grand_estate': { live_in: 7000, live_out: 7800 },         // 251-300m2, spacious 3-4 oversized bedrooms
     'monumental_manor': { live_in: 8000, live_out: 9000 },     // 301-360m2, luxurious 5+ oversized bedrooms
     'epic_estates': { live_in: 10000, live_out: 11000 }        // 361m2+, grand luxury living
   };
@@ -171,24 +171,25 @@ export const calculateLongTermPricing = (
   const placementFees = {
     'pocket_palace': 2500,      // Standard homes
     'family_hub': 2500,         // Standard homes
-    'grand_retreat': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5), // Premium homes: 50% of monthly rate
+    'grand_estate': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5), // Premium homes: 50% of monthly rate
+    'monumental_manor': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5), // Premium homes: 50% of monthly rate
     'epic_estates': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5)   // Premium homes: 50% of monthly rate
   };
 
   const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);
   const total = baseRate + addOnTotal;
   
-  // Calculate placement fee based on home size (CORRECTED - use baseRate not total)
+  // Calculate placement fee based on home size (UPDATED - include monumental_manor as premium)
   const calculatePlacementFee = (homeSize: string, baseRateOnly: number): number => {
     const mappedSize = homeSize?.toLowerCase().replace(/[- ]/g, '_');
     
-    // Flat R2,500 for standard homes and Grand Estate
-    if (['pocket_palace', 'family_hub', 'grand_estate'].includes(mappedSize)) {
+    // Flat R2,500 for standard homes
+    if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
       return 2500;
     }
     
-    // 50% for premium estates only
-    if (mappedSize === 'monumental_manor' || mappedSize === 'epic_estates') {
+    // 50% for premium estates only (grand_estate, monumental_manor, epic_estates)
+    if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
       return Math.round(baseRateOnly * 0.5);
     }
     
