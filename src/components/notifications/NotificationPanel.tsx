@@ -10,6 +10,17 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function NotificationPanel() {
   const { data: notifications, isLoading } = useNotifications();
@@ -18,6 +29,7 @@ export default function NotificationPanel() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const filteredNotifications = notifications?.filter(n => 
@@ -34,6 +46,7 @@ export default function NotificationPanel() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      case 'booking_request':
       case 'booking_update':
       case 'booking_confirmed':
       case 'booking_cancelled':
@@ -60,6 +73,7 @@ export default function NotificationPanel() {
     switch (notification.type) {
       case 'invoice_available':
         return '/client/invoices';
+      case 'booking_request':
       case 'booking_update':
       case 'booking_confirmed':
       case 'booking_cancelled':
@@ -93,12 +107,19 @@ export default function NotificationPanel() {
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    deleteNotification.mutate(id, {
+    setNotificationToDelete(id);
+  };
+
+  const confirmDelete = () => {
+    if (!notificationToDelete) return;
+
+    deleteNotification.mutate(notificationToDelete, {
       onSuccess: () => {
         toast({
           title: "Notification deleted",
           description: "The notification has been removed.",
         });
+        setNotificationToDelete(null);
       },
       onError: (error) => {
         console.error('Delete error:', error);
@@ -107,6 +128,7 @@ export default function NotificationPanel() {
           description: "Could not delete the notification. Please try again.",
           variant: "destructive",
         });
+        setNotificationToDelete(null);
       }
     });
   };
@@ -213,14 +235,38 @@ export default function NotificationPanel() {
                           </div>
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => handleDelete(notification.id, e)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                              disabled={deleteNotification.isPending && notificationToDelete === notification.id}
+                              onClick={(e) => handleDelete(notification.id, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Notification</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this notification? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setNotificationToDelete(null)}>
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={confirmDelete}
+                                disabled={deleteNotification.isPending}
+                              >
+                                {deleteNotification.isPending ? 'Deleting...' : 'Delete'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </CardContent>
                   </Card>

@@ -29,6 +29,7 @@ import { AdminBookingReassignment } from '@/components/AdminBookingReassignment'
 import { BookingDetailsDialog } from '@/components/BookingDetailsDialog';
 import { BookingWithRelations } from '@/types/booking';
 import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
+import { useBookingRealtime } from '@/hooks/useBookingRealtime';
 
 type BookingData = BookingWithRelations;
 
@@ -42,6 +43,13 @@ export default function AdminBookingManagement() {
   const [selectedBooking, setSelectedBooking] = useState<BookingData | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Enable real-time booking updates for admin
+  useBookingRealtime({
+    onBookingInsert: () => loadBookings(),
+    onBookingUpdate: () => loadBookings(),
+    onBookingDelete: () => loadBookings()
+  });
 
   useEffect(() => {
     loadBookings();

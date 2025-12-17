@@ -9,6 +9,7 @@ import { Calendar, Coins, Star, Clock, MapPin, Users } from 'lucide-react';
 import { SmartChatWidget } from '@/components/SmartChatWidget';
 import { useToast } from '@/hooks/use-toast';
 import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
+import { useBookingRealtime } from '@/hooks/useBookingRealtime';
 
 interface NannyStats {
   totalBookings: number;
@@ -30,41 +31,21 @@ export default function NannyDashboard() {
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Setup realtime subscription for bookings
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('nanny-bookings-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bookings',
-          filter: `nanny_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Booking change detected:', payload);
-          // Reload data when bookings change
-          loadNannyStats();
-          loadRecentBookings();
-          
-          // Show notification for new bookings
-          if (payload.eventType === 'INSERT') {
-            toast({
-              title: "New Booking Request",
-              description: "You have a new booking request to review.",
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, toast]);
+  // Enable real-time booking updates for nanny dashboard
+  useBookingRealtime({
+    onBookingInsert: () => {
+      loadNannyStats();
+      loadRecentBookings();
+    },
+    onBookingUpdate: () => {
+      loadNannyStats();
+      loadRecentBookings();
+    },
+    onBookingDelete: () => {
+      loadNannyStats();
+      loadRecentBookings();
+    }
+  });
 
   useEffect(() => {
     if (user) {

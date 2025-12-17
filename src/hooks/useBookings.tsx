@@ -6,6 +6,7 @@ import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/type
 import { useAuthContext } from '@/components/AuthProvider';
 import { useMatchingNannies } from '@/hooks/useNannies';
 import { validateStoredBooking } from '@/utils/bookingValidation';
+import { useBookingRealtime } from './useBookingRealtime';
 
 type Booking = Tables<'bookings'>;
 type BookingInsert = TablesInsert<'bookings'>;
@@ -21,7 +22,10 @@ export type BookingWithNanny = Booking & {
 export const useBookings = () => {
   const { user } = useAuthContext();
   const userType = user?.user_metadata?.user_type || 'client';
-  
+
+  // Enable real-time booking updates
+  useBookingRealtime();
+
   console.log('useBookings - User ID:', user?.id, 'User Type:', userType);
   
   const { data: bookings, isLoading: bookingsLoading, error, refetch } = useQuery({
