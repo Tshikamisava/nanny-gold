@@ -243,10 +243,10 @@ export const ProfessionalDevelopmentComplianceFlow: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-purple-900 mb-4">
+        <h2 className="text-2xl font-bold text-fuchsia-900 mb-4">
           Professional Development Compliance Flow
         </h2>
-        <p className="text-purple-700 mb-6">
+        <p className="text-fuchsia-700 mb-6">
           Step-by-step breakdown of what happens when nannies become overdue on training
         </p>
         

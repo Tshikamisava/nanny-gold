@@ -349,7 +349,7 @@ export default function AdminClientManagement() {
                   <div key={client.id} className="p-4 border rounded-lg hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-100 to-fuchsia-100 flex items-center justify-center">
                           <Users className="w-6 h-6 text-blue-600" />
                         </div>
                         <div>

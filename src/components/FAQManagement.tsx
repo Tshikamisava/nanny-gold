@@ -182,7 +182,7 @@ export const FAQManagement = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-purple-500" />
+              <TrendingUp className="w-5 h-5 text-fuchsia-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Total Views</p>
                 <p className="text-2xl font-bold">{stats.totalViews}</p>

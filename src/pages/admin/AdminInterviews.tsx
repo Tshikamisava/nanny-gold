@@ -66,13 +66,15 @@ const AdminInterviews = () => {
           id,
           approval_status,
           verification_status,
+          interview_status,
           profiles!inner(
             first_name,
             last_name,
             email
           )
         `)
-        .eq('approval_status', 'pending')
+        .in('verification_status', ['interview_required', 'document_pending'])
+        .order('verification_status', { ascending: false })
         .order('profiles.first_name', { ascending: true });
 
       if (error) throw error;
@@ -357,20 +359,35 @@ const AdminInterviews = () => {
                       filteredNannies.map((nanny) => (
                         <div
                           key={nanny.id}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                           onClick={() => selectNanny(nanny)}
                         >
                           <div className="font-medium">
                             {nanny.profiles?.first_name} {nanny.profiles?.last_name}
                           </div>
                           <div className="text-sm text-gray-500">{nanny.profiles?.email}</div>
-                          <div className="text-xs text-gray-400">
-                            Status: {nanny.verification_status.replace('_', ' ')}
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge 
+                              variant={nanny.verification_status === 'interview_required' ? 'default' : 'outline'}
+                              className="text-xs"
+                            >
+                              {nanny.verification_status.replace('_', ' ')}
+                            </Badge>
+                            {nanny.interview_status && (
+                              <Badge variant="secondary" className="text-xs">
+                                {nanny.interview_status.replace('_', ' ')}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="px-3 py-2 text-gray-500">No nannies found</div>
+                      <div className="px-3 py-2 text-gray-500">
+                        {availableNannies.length === 0 
+                          ? 'No nannies available for interviews. Nannies must have their documents verified first.'
+                          : 'No matches found. Try a different search term.'
+                        }
+                      </div>
                     )}
                   </div>
                 )}

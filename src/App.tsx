@@ -74,6 +74,7 @@ const AdminTools = lazy(() => import("./pages/admin/AdminTools").then(module => 
 const AdminInvoicingRewards = lazy(() => import("./pages/admin/AdminInvoicingRewards").then(module => ({ default: module.AdminInvoicingRewards })));
 const AdminPaymentProofs = lazy(() => import("./pages/admin/AdminPaymentProofs"));
 const AdminTestingSuite = lazy(() => import("./pages/admin/AdminTestingSuite").then(module => ({ default: module.default })));
+const CommunicationCalendarTester = lazy(() => import("./components/CommunicationCalendarTester"));
 
 // Nanny Pages (lazy loaded)
 const NannyMessages = lazy(() => import("./pages/nanny/NannyMessages"));
@@ -98,9 +99,16 @@ const ClientInvoices = lazy(() => import("./pages/client/ClientInvoices"));
 const ClientPaymentSettings = lazy(() => import("./pages/client/ClientPaymentSettings"));
 const ClientProfileSettings = lazy(() => import("./pages/client/ClientProfileSettings"));
 const ClientNotifications = lazy(() => import("./pages/client/ClientNotifications"));
+const NotificationPanel = lazy(() => import("./components/notifications/NotificationPanel"));
 const ClientPrivacyPolicy = lazy(() => import("./pages/client/ClientPrivacyPolicy"));
 const ClientTermsConditions = lazy(() => import("./pages/client/ClientTermsConditions"));
 const ClientReferrals = lazy(() => import("./pages/client/ClientReferrals").then(module => ({ default: module.ClientReferrals })));
+const ClientEmails = lazy(() => import("./pages/client/ClientEmails"));
+const NannyEmails = lazy(() => import("./pages/nanny/NannyEmails"));
+const AdminEmails = lazy(() => import("./pages/admin/AdminEmails"));
+
+// Enhanced Auth Pages
+const EnhancedSignup = lazy(() => import("./pages/EnhancedSignup"));
 
 // Loading component
 const PageLoader = () => (
@@ -188,6 +196,11 @@ const App = () => {
                 </PublicRoute>
               } />
               <Route path="/signup" element={<Navigate to="/auth?mode=signup" replace />} />
+              <Route path="/enhanced-signup" element={
+                <PublicRoute>
+                  <Suspense fallback={<PageLoader />}><EnhancedSignup /></Suspense>
+                </PublicRoute>
+              } />
               <Route path="/admin-login" element={
                 <PublicRoute>
                   <AdminLogin />
@@ -240,7 +253,10 @@ const App = () => {
                 <Route path="payment-proofs" element={<Suspense fallback={<PageLoader />}><AdminPaymentProofs /></Suspense>} />
                 <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AdminAnalytics /></Suspense>} />
                 <Route path="testing-suite" element={<Suspense fallback={<PageLoader />}><AdminTestingSuite /></Suspense>} />
+                <Route path="communication-test" element={<Suspense fallback={<PageLoader />}><CommunicationCalendarTester /></Suspense>} />
                 <Route path="invoicing-rewards" element={<Suspense fallback={<PageLoader />}><AdminInvoicingRewards /></Suspense>} />
+                <Route path="notifications-inbox" element={<Suspense fallback={<PageLoader />}><NotificationPanel /></Suspense>} />
+                <Route path="emails" element={<Suspense fallback={<PageLoader />}><AdminEmails /></Suspense>} />
               </Route>
 
               {/* Nanny Routes */}
@@ -260,6 +276,8 @@ const App = () => {
                 <Route path="privacy-policy" element={<Suspense fallback={<PageLoader />}><NannyPrivacyPolicy /></Suspense>} />
                 <Route path="terms-conditions" element={<Suspense fallback={<PageLoader />}><NannyTermsConditions /></Suspense>} />
                 <Route path="notifications" element={<Suspense fallback={<PageLoader />}><ClientNotifications /></Suspense>} />
+                <Route path="notifications-inbox" element={<Suspense fallback={<PageLoader />}><NotificationPanel /></Suspense>} />
+                <Route path="emails" element={<Suspense fallback={<PageLoader />}><NannyEmails /></Suspense>} />
               </Route>
 
               {/* Client Routes */}
@@ -301,6 +319,22 @@ const App = () => {
               }>
                 <Route index element={<Suspense fallback={<PageLoader />}><ClientNotifications /></Suspense>} />
               </Route>
+              <Route path="/client/notifications-inbox" element={
+                <TenantRoute requiredRole="client">
+                  <ClientLayout />
+                </TenantRoute>
+              }>
+                <Route index element={<Suspense fallback={<PageLoader />}><NotificationPanel /></Suspense>} />
+              </Route>
+
+              <Route path="/client/emails" element={
+                <TenantRoute requiredRole="client">
+                  <ClientLayout />
+                </TenantRoute>
+              }>
+                <Route index element={<Suspense fallback={<PageLoader />}><ClientEmails /></Suspense>} />
+              </Route>
+
               <Route path="/client/referrals" element={
                 <TenantRoute requiredRole="client">
                   <ClientLayout />

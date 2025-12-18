@@ -28,6 +28,7 @@ import { formatCurrency } from '@/utils/pricingUtils';
 import { AdminBookingReassignment } from '@/components/AdminBookingReassignment';
 import { BookingDetailsDialog } from '@/components/BookingDetailsDialog';
 import { BookingWithRelations } from '@/types/booking';
+import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
 
 type BookingData = BookingWithRelations;
 
@@ -273,15 +274,74 @@ export default function AdminBookingManagement() {
     }
   };
 
+  // Helper functions for revenue calculation
+  const calculatePlacementFee = (booking: any) => {
+    if (booking.booking_type !== 'long_term') return 35; // R35 service fee for short-term (waived for gap coverage)
+    
+    const homeSize = booking.clients?.home_size || '';
+    const mappedSize = homeSize.toLowerCase().replace(/[- ]/g, '_');
+    
+    // Flat R2,500 for standard homes (Pocket Palace, Family Hub)
+    if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
+      return 2500;
+    }
+    
+    // 50% of monthly rate for premium estates (Grand Estate, Monumental Manor, Epic Estates)
+    if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
+      return Math.round(booking.total_monthly_cost * 0.5);
+    }
+    
+    return 2500; // Default fallback
+  };
+
+  const calculateCommission = (booking: any) => {
+    if (booking.booking_type !== 'long_term') return 20; // 20% for short-term
+    
+    const monthlyRate = booking.total_monthly_cost;
+    
+    // Updated commission tiers
+    if (monthlyRate >= 10000) {
+      return 30; // Premium tier: 30%
+    } else if (monthlyRate <= 5000) {
+      return 5;  // Budget tier: 5%
+    } else {
+      return 20; // Standard tier: 20%
+    }
+  };
+
   /**
    * Note: booking_financials is returned as an array by Supabase even though it's a one-to-one relationship
    * This is standard behavior for nested selects in Supabase
    */
   const totalRevenue = bookings
     .filter(b => ['confirmed', 'active', 'completed'].includes(b.status))
-    .reduce((sum, booking) => 
-      sum + (booking.booking_financials?.[0]?.admin_total_revenue || 0), 0
-    );
+    .reduce((sum, booking) => {
+      const adminRevenue = booking.booking_financials?.[0]?.admin_total_revenue;
+      if (adminRevenue && adminRevenue > 0) {
+        return sum + adminRevenue;
+      }
+      // Fallback calculation if database hasn't been updated
+      const placementFee = calculatePlacementFee(booking);
+      const commission = calculateCommission(booking);
+      return sum + (placementFee + commission);
+    }, 0);
+
+  // Breakdown of total revenue
+  const totalPlacementFees = bookings
+    .filter(b => ['confirmed', 'active', 'completed'].includes(b.status))
+    .reduce((sum, booking) => {
+      const fee = booking.booking_financials?.[0]?.fixed_fee;
+      if (fee && fee > 0) return sum + fee;
+      return sum + calculatePlacementFee(booking);
+    }, 0);
+
+  const totalCommission = bookings
+    .filter(b => ['confirmed', 'active', 'completed'].includes(b.status))
+    .reduce((sum, booking) => {
+      const commission = booking.booking_financials?.[0]?.commission_amount;
+      if (commission && commission > 0) return sum + commission;
+      return sum + calculateCommission(booking);
+    }, 0);
 
   const pendingBookings = bookings.filter(b => b.status === 'pending');
   const activeBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'active');
@@ -353,6 +413,16 @@ export default function AdminBookingManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-lg md:text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Placement Fees:</span>
+                <span className="text-blue-600 font-medium">{formatCurrency(totalPlacementFees)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Commission:</span>
+                <span className="text-fuchsia-600 font-medium">{formatCurrency(totalCommission)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -399,6 +469,8 @@ export default function AdminBookingManagement() {
               onAcceptBooking={handleAcceptBooking}
               onGenerateInvoice={handleGenerateInvoice}
               toast={toast}
+              calculatePlacementFee={calculatePlacementFee}
+              calculateCommission={calculateCommission}
             />
             </CardContent>
           </Card>
@@ -419,6 +491,8 @@ export default function AdminBookingManagement() {
                 onAcceptBooking={handleAcceptBooking}
                 onGenerateInvoice={handleGenerateInvoice}
                 toast={toast}
+                calculatePlacementFee={calculatePlacementFee}
+                calculateCommission={calculateCommission}
               />
             </CardContent>
           </Card>
@@ -439,6 +513,8 @@ export default function AdminBookingManagement() {
                 onAcceptBooking={handleAcceptBooking}
                 onGenerateInvoice={handleGenerateInvoice}
                 toast={toast}
+                calculatePlacementFee={calculatePlacementFee}
+                calculateCommission={calculateCommission}
               />
             </CardContent>
           </Card>
@@ -459,6 +535,8 @@ export default function AdminBookingManagement() {
                 onAcceptBooking={handleAcceptBooking}
                 onGenerateInvoice={handleGenerateInvoice}
                 toast={toast}
+                calculatePlacementFee={calculatePlacementFee}
+                calculateCommission={calculateCommission}
               />
             </CardContent>
           </Card>
@@ -479,6 +557,8 @@ export default function AdminBookingManagement() {
                 onAcceptBooking={handleAcceptBooking}
                 onGenerateInvoice={handleGenerateInvoice}
                 toast={toast}
+                calculatePlacementFee={calculatePlacementFee}
+                calculateCommission={calculateCommission}
               />
             </CardContent>
           </Card>
@@ -509,9 +589,11 @@ interface BookingsListProps {
   onAcceptBooking: (bookingId: string) => void;
   onGenerateInvoice: (bookingId: string) => void;
   toast?: any;
+  calculatePlacementFee: (booking: any) => number;
+  calculateCommission: (booking: any) => number;
 }
 
-function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessageClient, onAcceptBooking, onGenerateInvoice, toast = () => {} }: BookingsListProps) {
+function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessageClient, onAcceptBooking, onGenerateInvoice, toast = () => {}, calculatePlacementFee, calculateCommission }: BookingsListProps) {
   if (bookings.length === 0) {
     return (
       <div className="text-center py-8">
@@ -555,8 +637,8 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
           <div key={booking.id} className="p-4 border rounded-lg hover:bg-gray-50">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-fuchsia-100 to-pink-100 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-fuchsia-600" />
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">{clientName}</h4>
@@ -586,7 +668,15 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <p className="text-sm text-green-600 flex items-center justify-end gap-1 cursor-help">
-                        Admin Revenue: {formatCurrency(booking.booking_financials?.[0]?.admin_total_revenue || 0)}
+                        Admin Revenue: {
+                          (() => {
+                            const dbRevenue = booking.booking_financials?.[0]?.admin_total_revenue;
+                            if (dbRevenue && dbRevenue > 0) return formatCurrency(dbRevenue);
+                            const placementFee = calculatePlacementFee(booking);
+                            const commission = calculateCommission(booking);
+                            return formatCurrency(placementFee + commission);
+                          })()
+                        }
                         <Info className="w-3 h-3" />
                       </p>
                     </TooltipTrigger>
@@ -594,23 +684,42 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
                       <div className="text-xs space-y-2">
                         <div className="font-semibold border-b pb-1">Revenue Breakdown</div>
                         <div className="space-y-1">
-                          <div className="flex justify-between gap-4">
-                            <span className="text-muted-foreground">Placement Fee:</span>
-                            <span className="font-medium">{formatCurrency(booking.booking_financials?.[0]?.fixed_fee || 0)}</span>
-                          </div>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-muted-foreground">Commission ({booking.booking_financials?.[0]?.commission_percent || 0}%):</span>
-                            <span className="font-medium">{formatCurrency(booking.booking_financials?.[0]?.commission_amount || 0)}</span>
-                          </div>
-                          <div className="flex justify-between gap-4 pt-1 border-t font-semibold">
-                            <span>Total Admin Revenue:</span>
-                            <span className="text-green-600">{formatCurrency(booking.booking_financials?.[0]?.admin_total_revenue || 0)}</span>
-                          </div>
+                          {(() => {
+                            const placementFee = booking.booking_financials?.[0]?.fixed_fee || calculatePlacementFee(booking);
+                            const commissionPercent = booking.booking_financials?.[0]?.commission_percent || 
+                              (() => {
+                                const homeSize = booking.clients?.home_size || '';
+                                if (booking.booking_type !== 'long_term') return 20;
+                                if (homeSize.toLowerCase().includes('extra_large') || homeSize.toLowerCase().includes('grand') || homeSize.toLowerCase().includes('monumental')) return 10;
+                                if (homeSize.toLowerCase().includes('large')) return 15;
+                                if (homeSize.toLowerCase().includes('medium')) return 20;
+                                return 25;
+                              })();
+                            const commissionAmount = booking.booking_financials?.[0]?.commission_amount || calculateCommission(booking);
+                            const totalAdminRevenue = booking.booking_financials?.[0]?.admin_total_revenue || (placementFee + commissionAmount);
+                            
+                            return (
+                              <>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Placement Fee:</span>
+                                  <span className="font-medium">{formatCurrency(placementFee)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Commission ({commissionPercent}%):</span>
+                                  <span className="font-medium">{formatCurrency(commissionAmount)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 pt-1 border-t font-semibold">
+                                  <span>Total Admin Revenue:</span>
+                                  <span className="text-green-600">{formatCurrency(totalAdminRevenue)}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                         <div className="pt-2 border-t space-y-1">
                           <div className="flex justify-between gap-4">
                             <span className="text-muted-foreground">Nanny Earnings:</span>
-                            <span className="font-medium text-blue-600">{formatCurrency(booking.booking_financials?.[0]?.nanny_earnings || 0)}</span>
+                            <span className="font-medium text-blue-600">{formatCurrency(booking.booking_financials?.[0]?.nanny_earnings || (booking.base_rate + (booking.additional_services_cost || 0) - calculateCommission(booking)))}</span>
                           </div>
                         </div>
                       </div>
@@ -633,6 +742,23 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
                 <p className="text-gray-600">Client Email</p>
                 <p className="font-medium">{booking.clients.profiles.email}</p>
               </div>
+            </div>
+
+            {/* Revenue Transparency Display for Admin */}
+            <div className="mb-4">
+              <BookingRevenueDisplay
+                bookingType={booking.booking_type}
+                totalCost={booking.total_monthly_cost}
+                baseRate={booking.base_rate}
+                additionalServices={booking.additional_services_cost}
+                placementFee={booking.booking_financials?.[0]?.fixed_fee}
+                commissionPercent={booking.booking_financials?.[0]?.commission_percent}
+                commissionAmount={booking.booking_financials?.[0]?.commission_amount}
+                nannyEarnings={booking.booking_financials?.[0]?.nanny_earnings}
+                adminRevenue={booking.booking_financials?.[0]?.admin_total_revenue}
+                homeSize={booking.clients.home_size}
+                userRole="admin"
+              />
             </div>
 
             <div className="flex space-x-2">

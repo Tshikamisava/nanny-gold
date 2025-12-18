@@ -20,7 +20,9 @@ import {
   UserPlus,
   ArrowRight,
   AlertCircle,
-  XCircle
+  XCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { SmartChatWidget } from '@/components/SmartChatWidget';
 import { BookingModificationDialog } from '@/components/BookingModificationDialog';
@@ -44,6 +46,11 @@ export default function ClientDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [activePage, setActivePage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [overviewPage, setOverviewPage] = useState(1);
+  const itemsPerPage = 5;
   
   const navigate = useNavigate();
   const { user } = useAuthContext();
@@ -99,7 +106,7 @@ export default function ClientDashboard() {
     setRefreshKey(prev => prev + 1);
   }, [refetchBookings]);
 
-  // Phase 5: Real-time subscription for booking updates
+  // Phase 5: Enhanced real-time subscription for booking updates with validation
   useEffect(() => {
     if (!user?.id) return;
 
@@ -111,21 +118,65 @@ export default function ClientDashboard() {
         table: 'bookings',
         filter: `client_id=eq.${user.id}`
       }, (payload) => {
-        console.log('Booking change detected:', payload);
+        console.log('📡 Booking change detected:', payload.eventType, payload.new?.id);
+        
+        // Invalidate and refetch to get fresh data with joins
         refetchBookings();
-        if (payload.eventType === 'UPDATE') {
+        
+        // Show appropriate notification based on event type
+        if (payload.eventType === 'INSERT') {
           toast({
-            title: "Booking Updated",
-            description: "Your booking status has changed",
+            title: "Booking Created",
+            description: "A new booking has been added to your dashboard and calendar.",
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const oldStatus = payload.old?.status;
+          const newStatus = payload.new?.status;
+          
+          if (newStatus === 'confirmed' && oldStatus !== 'confirmed') {
+            toast({
+              title: "Booking Confirmed",
+              description: "Your booking has been confirmed by the nanny.",
+            });
+          } else if (newStatus === 'active' && oldStatus !== 'active') {
+            toast({
+              title: "Booking Active",
+              description: "Your booking is now active.",
+            });
+          } else if (newStatus === 'completed' && oldStatus !== 'completed') {
+            toast({
+              title: "Booking Completed",
+              description: "Your booking has been completed. Please rate your experience.",
+            });
+          } else if (newStatus === 'cancelled') {
+            toast({
+              title: "Booking Cancelled",
+              description: "A booking has been cancelled.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Booking Updated",
+              description: "Your booking details have been updated.",
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          toast({
+            title: "Booking Removed",
+            description: "A booking has been removed from your dashboard.",
+            variant: "destructive"
           });
         }
       })
       .subscribe();
 
+    console.log('✅ Real-time subscription active for client bookings');
+
     return () => {
       supabase.removeChannel(channel);
+      console.log('🔌 Real-time subscription closed');
     };
-  }, [user?.id, refetchBookings]);
+  }, [user?.id, refetchBookings, toast]);
 
   // Fetch invoice data for totalSpent calculation
   useEffect(() => {
@@ -337,8 +388,10 @@ export default function ClientDashboard() {
                       </Button>
                     </div>
                   ) : (
-                    activeBookings.slice(0, 3).map((booking) => (
-                      <div key={booking.id} className="space-y-3">
+                    activeBookings
+                      .slice((overviewPage - 1) * itemsPerPage, overviewPage * itemsPerPage)
+                      .map((booking) => (
+                      <div key={booking.id} className="space-y-2">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 sm:p-3 bg-accent/10 rounded-lg gap-2">
                           <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                             <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
@@ -367,6 +420,31 @@ export default function ClientDashboard() {
                     ))
                   )}
                 </div>
+                
+                {/* Pagination for Overview Active Bookings */}
+                {activeBookings.length > itemsPerPage && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOverviewPage(p => Math.max(1, p - 1))}
+                      disabled={overviewPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {overviewPage} of {Math.ceil(activeBookings.length / itemsPerPage)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOverviewPage(p => Math.min(Math.ceil(activeBookings.length / itemsPerPage), p + 1))}
+                      disabled={overviewPage >= Math.ceil(activeBookings.length / itemsPerPage)}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -377,15 +455,17 @@ export default function ClientDashboard() {
                   <CardTitle className="text-lg md:text-xl">Booking Management</CardTitle>
                   <CardDescription className="text-sm">Modify your current bookings</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {activeBookings.map((booking) => (
-                    <div key={booking.id} className="border rounded-lg p-4 space-y-3">
+                <CardContent className="space-y-3">
+                  {activeBookings
+                    .slice((overviewPage - 1) * itemsPerPage, overviewPage * itemsPerPage)
+                    .map((booking) => (
+                    <div key={booking.id} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-medium">
+                          <h4 className="font-medium text-sm">
                             {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
                           </h4>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {format(new Date(booking.start_date), 'PPP')} - 
                             {booking.end_date ? format(new Date(booking.end_date), 'PPP') : 'Ongoing'}
                           </p>
@@ -423,92 +503,121 @@ export default function ClientDashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {pendingBookings.map((booking) => {
-                const daysWaiting = Math.floor(
-                  (new Date().getTime() - new Date(booking.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                );
-                const isUrgent = daysWaiting > 2;
-                
-                return (
-                  <Card key={booking.id} className={isUrgent ? "border-orange-300 bg-orange-50/30" : ""}>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {/* Header */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <Clock className={`w-5 h-5 ${isUrgent ? 'text-orange-600' : 'text-muted-foreground'}`} />
+            <>
+              <div className="space-y-4">
+                {pendingBookings
+                  .slice((pendingPage - 1) * itemsPerPage, pendingPage * itemsPerPage)
+                  .map((booking) => {
+                  const daysWaiting = Math.floor(
+                    (new Date().getTime() - new Date(booking.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  const isUrgent = daysWaiting > 2;
+                  
+                  return (
+                    <Card key={booking.id} className={isUrgent ? "border-orange-300 bg-orange-50/30" : ""}>
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <Clock className={`w-5 h-5 ${isUrgent ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {booking.booking_type === 'long_term' ? 'Long-term Care Request' : 'Short-term Booking Request'}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Requested {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant={isUrgent ? "destructive" : "secondary"}>
+                              {isUrgent ? `${daysWaiting} days waiting` : 'Pending'}
+                            </Badge>
+                          </div>
+
+                          {/* Booking Details */}
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>
-                              <h3 className="font-semibold text-lg">
-                                {booking.booking_type === 'long_term' ? 'Long-term Care Request' : 'Short-term Booking Request'}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Requested {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
-                              </p>
+                              <p className="text-xs text-muted-foreground">Start Date</p>
+                              <p className="font-medium">{format(new Date(booking.start_date), 'MMM dd, yyyy')}</p>
+                            </div>
+                            {booking.end_date && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">End Date</p>
+                                <p className="font-medium">{format(new Date(booking.end_date), 'MMM dd, yyyy')}</p>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                              <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
                             </div>
                           </div>
-                          <Badge variant={isUrgent ? "destructive" : "secondary"}>
-                            {isUrgent ? `${daysWaiting} days waiting` : 'Pending'}
-                          </Badge>
-                        </div>
 
-                        {/* Booking Details */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Start Date</p>
-                            <p className="font-medium">{format(new Date(booking.start_date), 'MMM dd, yyyy')}</p>
-                          </div>
-                          {booking.end_date && (
-                            <div>
-                              <p className="text-xs text-muted-foreground">End Date</p>
-                              <p className="font-medium">{format(new Date(booking.end_date), 'MMM dd, yyyy')}</p>
+                          {/* Nanny Info */}
+                          {booking.nannies && (
+                            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                              <User className="w-8 h-8 text-muted-foreground" />
+                              <div>
+                                <p className="text-xs text-muted-foreground">Requested Nanny</p>
+                                <p className="font-medium">
+                                  {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
+                                </p>
+                              </div>
                             </div>
                           )}
-                          <div>
-                            <p className="text-xs text-muted-foreground">Monthly Cost</p>
-                            <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
-                          </div>
-                        </div>
 
-                        {/* Nanny Info */}
-                        {booking.nannies && (
-                          <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-                            <User className="w-8 h-8 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Requested Nanny</p>
-                              <p className="font-medium">
-                                {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}
-                          >
-                            View Details
-                          </Button>
-                          {isUrgent && (
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 pt-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-orange-600 border-orange-300"
+                              onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}
                             >
-                              <AlertCircle className="w-4 h-4 mr-2" />
-                              Contact Support
+                              View Details
                             </Button>
-                          )}
+                            {isUrgent && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-orange-600 border-orange-300"
+                              >
+                                <AlertCircle className="w-4 h-4 mr-2" />
+                                Contact Support
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              
+              {/* Pagination for Pending */}
+              {pendingBookings.length > itemsPerPage && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                    disabled={pendingPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {pendingPage} of {Math.ceil(pendingBookings.length / itemsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPendingPage(p => Math.min(Math.ceil(pendingBookings.length / itemsPerPage), p + 1))}
+                    disabled={pendingPage >= Math.ceil(pendingBookings.length / itemsPerPage)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
@@ -529,256 +638,204 @@ export default function ClientDashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {activeBookings.filter(b => b.status !== 'pending').map((booking) => (
-                <Card key={booking.id}>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle className="w-5 h-5 text-primary" />
-                          <div>
-                            <h3 className="font-semibold text-lg">
-                              {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                              Started {format(new Date(booking.start_date), 'PPP')}
-                            </p>
+            <>
+              <div className="space-y-4">
+                {activeBookings
+                  .filter(b => b.status !== 'pending')
+                  .slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage)
+                  .map((booking) => (
+                  <Card key={booking.id}>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <CheckCircle className="w-5 h-5 text-primary" />
+                            <div>
+                              <h3 className="font-semibold text-lg">
+                                {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Started {format(new Date(booking.start_date), 'PPP')}
+                              </p>
+                            </div>
                           </div>
+                          <Badge variant="default">{booking.status}</Badge>
                         </div>
-                        <Badge variant="default">{booking.status}</Badge>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Monthly Cost</p>
-                          <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
-                        </div>
-                        {booking.living_arrangement && (
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-xs text-muted-foreground">Arrangement</p>
-                            <p className="font-medium capitalize">{booking.living_arrangement.replace('_', ' ')}</p>
+                            <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                            <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
+                          </div>
+                          {booking.living_arrangement && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Arrangement</p>
+                              <p className="font-medium capitalize">{booking.living_arrangement.replace('_', ' ')}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {booking.nannies && (
+                          <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-lg">
+                            <User className="w-8 h-8 text-primary" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Your Nanny</p>
+                              <p className="font-medium">
+                                {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
+                              </p>
+                            </div>
                           </div>
                         )}
-                      </div>
 
-                      {booking.nannies && (
-                        <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-lg">
-                          <User className="w-8 h-8 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Your Nanny</p>
-                            <p className="font-medium">
-                              {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
-                            </p>
-                          </div>
+                        <div className="flex gap-2 pt-2">
+                          <BookingModificationDialog 
+                            booking={booking} 
+                            onModificationSubmitted={handleModificationSubmitted}
+                          />
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}>
+                            View Details
+                          </Button>
                         </div>
-                      )}
 
-                      <div className="flex gap-2 pt-2">
-                        <BookingModificationDialog 
-                          booking={booking} 
-                          onModificationSubmitted={handleModificationSubmitted}
-                        />
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}>
-                          View Details
-                        </Button>
+                        <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
                       </div>
-
-                      <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Pagination for Active */}
+              {activeBookings.filter(b => b.status !== 'pending').length > itemsPerPage && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActivePage(p => Math.max(1, p - 1))}
+                    disabled={activePage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {activePage} of {Math.ceil(activeBookings.filter(b => b.status !== 'pending').length / itemsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActivePage(p => Math.min(Math.ceil(activeBookings.filter(b => b.status !== 'pending').length / itemsPerPage), p + 1))}
+                    disabled={activePage >= Math.ceil(activeBookings.filter(b => b.status !== 'pending').length / itemsPerPage)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
         {/* History Tab */}
         <TabsContent value="history" className="space-y-4">
-          <div className="space-y-4">
-            {completedBookings.length === 0 && cancelledBookings.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No History Yet</h3>
-                  <p className="text-muted-foreground text-center max-w-md">
-                    Your completed and cancelled bookings will appear here.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
+          {completedBookings.length === 0 && cancelledBookings.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Calendar className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No History Yet</h3>
+                <p className="text-muted-foreground text-center max-w-md">
+                  Your completed and cancelled bookings will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="space-y-4">
                 {completedBookings.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold">Completed Bookings</h3>
-                    {completedBookings.map((booking) => (
-                      <Card key={booking.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                              <div>
-                                <p className="font-medium">
-                                  {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {format(new Date(booking.start_date), 'MMM dd')} - 
-                                  {booking.end_date ? format(new Date(booking.end_date), 'MMM dd, yyyy') : 'Ongoing'}
-                                </p>
+                    {completedBookings
+                      .slice((historyPage - 1) * itemsPerPage, historyPage * itemsPerPage)
+                      .map((booking) => (
+                        <Card key={booking.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <CheckCircle className="w-5 h-5 text-green-600" />
+                                <div>
+                                  <p className="font-medium">
+                                    {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(booking.start_date), 'MMM dd')} - 
+                                    {booking.end_date ? format(new Date(booking.end_date), 'MMM dd, yyyy') : 'Ongoing'}
+                                  </p>
+                                </div>
                               </div>
+                              <Badge variant="secondary" className="bg-green-100 text-green-700">Completed</Badge>
                             </div>
-                            <Badge variant="secondary" className="bg-green-100 text-green-700">Completed</Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      ))}
                   </div>
                 )}
 
                 {cancelledBookings.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold">Cancelled Bookings</h3>
-                    {cancelledBookings.map((booking) => (
-                      <Card key={booking.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <XCircle className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium">
-                                  {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {format(new Date(booking.start_date), 'MMM dd, yyyy')}
-                                </p>
+                    {cancelledBookings
+                      .slice(completedBookings.length > 0 ? 0 : (historyPage - 1) * itemsPerPage, 
+                             completedBookings.length > 0 ? cancelledBookings.length : historyPage * itemsPerPage)
+                      .map((booking) => (
+                        <Card key={booking.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <XCircle className="w-5 h-5 text-muted-foreground" />
+                                <div>
+                                  <p className="font-medium">
+                                    {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(booking.start_date), 'MMM dd, yyyy')}
+                                  </p>
+                                </div>
                               </div>
+                              <Badge variant="secondary">Cancelled</Badge>
                             </div>
-                            <Badge variant="secondary">Cancelled</Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      ))}
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+
+              {/* Pagination for History */}
+              {(completedBookings.length + cancelledBookings.length) > itemsPerPage && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={historyPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {historyPage} of {Math.ceil((completedBookings.length + cancelledBookings.length) / itemsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHistoryPage(p => Math.min(Math.ceil((completedBookings.length + cancelledBookings.length) / itemsPerPage), p + 1))}
+                    disabled={historyPage >= Math.ceil((completedBookings.length + cancelledBookings.length) / itemsPerPage)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
-      {/* Recent Activity */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Active Bookings</CardTitle>
-            <CardDescription className="text-sm">Your confirmed childcare sessions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {activeBookings.length === 0 ? (
-                <div className="text-center py-6 md:py-8">
-                  <Calendar className="w-8 h-8 md:w-12 md:h-12 mx-auto mb-3 md:mb-4 text-muted-foreground" />
-                  <p className="text-sm md:text-base font-medium text-muted-foreground mb-2">No active bookings</p>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-4">Find and book your perfect nanny today</p>
-                  <Button size="sm" onClick={() => navigate('/service-prompt')}>
-                    Find a Nanny
-                    <Search className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              ) : (
-                activeBookings.slice(0, 3).map((booking) => (
-                  <div key={booking.id} className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-accent/10 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <CheckCircle className="w-5 h-5 text-primary flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm md:text-base truncate">
-                            {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
-                          </p>
-                          <p className="text-xs md:text-sm text-muted-foreground">
-                            Started {format(new Date(booking.start_date), 'MMM dd, yyyy')}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            R{booking.total_monthly_cost?.toFixed(2)}/month
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">{booking.status}</Badge>
-                        <BookingModificationDialog 
-                          booking={booking} 
-                          onModificationSubmitted={handleModificationSubmitted}
-                        />
-                      </div>
-                    </div>
-                    <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Booking Management Section */}
-        {activeBookings.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Booking Management</CardTitle>
-              <CardDescription className="text-sm">Modify your current bookings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {activeBookings.map((booking) => (
-                <div key={booking.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">
-                        {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(booking.start_date), 'PPP')} - 
-                        {booking.end_date ? format(new Date(booking.end_date), 'PPP') : 'Ongoing'}
-                      </p>
-                      <p className="text-sm font-medium">R{booking.total_monthly_cost?.toFixed(2)}/month</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
-                        {booking.status}
-                      </Badge>
-                      <BookingModificationDialog 
-                        booking={booking} 
-                        onModificationSubmitted={handleModificationSubmitted}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Current Services */}
-                  {booking.services && Object.keys(booking.services).length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Current Services:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.keys(booking.services).map(serviceKey => {
-                          const getServiceDisplayName = (key: string) => {
-                            if (key === 'special_needs') return 'Diverse Ability Support';
-                            return key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                          };
-                          
-                          return (
-                            <Badge key={serviceKey} variant="outline">
-                              {getServiceDisplayName(serviceKey)}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <LazyBookingModificationHistory key={`${booking.id}-${refreshKey}`} bookingId={booking.id} />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {/* Recent Activity */}
       <div className="grid gap-4 md:grid-cols-2">

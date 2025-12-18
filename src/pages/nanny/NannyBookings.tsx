@@ -8,6 +8,7 @@ import { useAuthContext } from '@/components/AuthProvider';
 import { Calendar, Clock, DollarSign, MapPin, Check, X } from 'lucide-react';
 import { NannyBookingDetailsDialog } from '@/components/nanny/NannyBookingDetailsDialog';
 import { useToast } from '@/hooks/use-toast';
+import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
 
 interface Booking {
   id: string;
@@ -531,6 +532,23 @@ export default function NannyBookings() {
                             ).toFixed(2)}
                           </div>
                         </div>
+                      </div>
+                      
+                      {/* Revenue Transparency Display */}
+                      <div className="mt-3 pt-3 border-t">
+                        <BookingRevenueDisplay
+                          bookingType={booking.booking_type}
+                          totalCost={booking.total_monthly_cost}
+                          baseRate={booking.base_rate}
+                          additionalServices={booking.additional_services_cost}
+                          placementFee={booking.placement_fee}
+                          commissionPercent={booking.commission_percent}
+                          commissionAmount={booking.commission_amount}
+                          nannyEarnings={booking.nanny_earnings}
+                          adminRevenue={booking.admin_revenue}
+                          homeSize={booking.client?.home_size}
+                          userRole="nanny"
+                        />
                       </div>
                       {formatAddressForDisplay(booking.client?.location) && (
                         <div className="flex items-center gap-2">

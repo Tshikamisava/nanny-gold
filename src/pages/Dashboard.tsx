@@ -73,7 +73,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-fuchsia-50 to-yellow-50">
       <div className="max-w-sm mx-auto">
         {/* Header with Navigation Arrows */}
         <div className="royal-gradient text-white p-6 rounded-b-3xl">
@@ -116,7 +116,7 @@ const Dashboard = () => {
               {/* Active Bookings */}
               <Card className="rounded-xl royal-shadow">
                 <CardContent className="p-6">
-                  <h3 className="font-semibold text-purple-900 mb-4">Active Bookings</h3>
+                  <h3 className="font-semibold text-fuchsia-900 mb-4">Active Bookings</h3>
                   {bookingsLoading ? (
                     <div className="text-center py-4">
                       <Clock className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-400" />
@@ -138,7 +138,7 @@ const Dashboard = () => {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium text-purple-900">{nannyName || 'Nanny'}</h4>
+                              <h4 className="font-medium text-fuchsia-900">{nannyName || 'Nanny'}</h4>
                               <Badge variant={bookingType.variant} className="flex items-center gap-1">
                                 <bookingType.icon className="w-3 h-3" />
                                 {bookingType.label}
@@ -182,7 +182,7 @@ const Dashboard = () => {
                 <Button
                   onClick={() => navigate('/support')}
                   variant="outline"
-                  className="h-20 flex-col space-y-2 border-purple-300 text-purple-700 rounded-xl"
+                  className="h-20 flex-col space-y-2 border-fuchsia-300 text-fuchsia-700 rounded-xl"
                 >
                   <MessageCircle className="w-6 h-6" />
                   <span className="text-sm">Support</span>
@@ -191,7 +191,7 @@ const Dashboard = () => {
             </TabsContent>
 
             <TabsContent value="nannies" className="space-y-4 mt-6">
-              <h3 className="font-semibold text-purple-900">All Bookings</h3>
+              <h3 className="font-semibold text-fuchsia-900">All Bookings</h3>
               {bookingsLoading ? (
                 <div className="text-center py-6">
                   <Clock className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-400" />
@@ -213,7 +213,7 @@ const Dashboard = () => {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium text-purple-900">{nannyName || 'Nanny'}</h4>
+                              <h4 className="font-medium text-fuchsia-900">{nannyName || 'Nanny'}</h4>
                               <Badge variant={bookingType.variant} className="flex items-center gap-1">
                                 <bookingType.icon className="w-3 h-3" />
                                 {bookingType.label}
@@ -246,13 +246,13 @@ const Dashboard = () => {
             </TabsContent>
 
             <TabsContent value="bookings" className="space-y-4 mt-6">
-              <h3 className="font-semibold text-purple-900">Upcoming Sessions</h3>
+              <h3 className="font-semibold text-fuchsia-900">Upcoming Sessions</h3>
               <Card className="rounded-xl royal-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-4">
-                    <Calendar className="w-8 h-8 text-purple-600" />
+                    <Calendar className="w-8 h-8 text-fuchsia-600" />
                     <div>
-                      <h4 className="font-medium text-purple-900">Today - Sarah Johnson</h4>
+                      <h4 className="font-medium text-fuchsia-900">Today - Sarah Johnson</h4>
                       <p className="text-sm text-gray-600">9:00 AM - 5:00 PM</p>
                     </div>
                   </div>
@@ -261,7 +261,7 @@ const Dashboard = () => {
             </TabsContent>
 
             <TabsContent value="messages" className="space-y-4 mt-6">
-              <h3 className="font-semibold text-purple-900">Messages</h3>
+              <h3 className="font-semibold text-fuchsia-900">Messages</h3>
               <Card className="rounded-xl royal-shadow">
                 <CardContent className="p-4 text-center">
                   <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -275,23 +275,23 @@ const Dashboard = () => {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4 mt-6">
-              <h3 className="font-semibold text-purple-900">Settings</h3>
+              <h3 className="font-semibold text-fuchsia-900">Settings</h3>
               <div className="space-y-3">
                 <Button
                   variant="outline"
-                  className="w-full justify-start border-purple-300 text-purple-700"
+                  className="w-full justify-start border-fuchsia-300 text-fuchsia-700"
                 >
                   Profile Settings
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start border-purple-300 text-purple-700"
+                  className="w-full justify-start border-fuchsia-300 text-fuchsia-700"
                 >
                   Payment Methods
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start border-purple-300 text-purple-700"
+                  className="w-full justify-start border-fuchsia-300 text-fuchsia-700"
                 >
                   Notifications
                 </Button>

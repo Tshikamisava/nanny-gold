@@ -191,7 +191,7 @@ export default function ComprehensiveTestReport() {
               <div className="text-sm text-muted-foreground">Failed</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{overallStats.totalCritical}</div>
+              <div className="text-2xl font-bold text-fuchsia-600">{overallStats.totalCritical}</div>
               <div className="text-sm text-muted-foreground">Critical</div>
             </div>
           </div>

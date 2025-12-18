@@ -71,11 +71,6 @@ export function AdminSidebar() {
     return currentPath.startsWith(path);
   };
 
-  const getNavClass = (path: string, exact = false) => {
-    const active = isActive(path, exact);
-    return active ? 'bg-muted text-primary font-medium' : 'hover:bg-muted/50';
-  };
-
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-60'} collapsible="icon">
       <SidebarContent>
@@ -90,6 +85,7 @@ export function AdminSidebar() {
                 }
                 
                 // All other sections are accessible to regular admins
+                const active = isActive(item.url, item.exact);
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -97,7 +93,11 @@ export function AdminSidebar() {
                       <NavLink 
                         to={item.url} 
                         end={item.exact}
-                        className={getNavClass(item.url, item.exact)}
+                        className={`flex items-center w-full rounded-lg transition-all ${
+                          active 
+                            ? 'bg-gradient-to-r from-fuchsia-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-fuchsia-600 hover:to-orange-400 hover:text-white'
+                        }`}
                         onClick={handleNavClick}
                       >
                         <item.icon className="w-4 h-4" />

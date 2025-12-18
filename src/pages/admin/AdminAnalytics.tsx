@@ -762,13 +762,13 @@ const AdminAnalytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Active Nannies</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-fuchsia-600">
                     {analyticsData.totalNanniesLive || 48}
                   </p>
-                  <p className="text-xs text-purple-500">+3 new ↗</p>
+                  <p className="text-xs text-fuchsia-500">+3 new ↗</p>
                 </div>
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Users className="h-5 w-5 text-purple-600" />
+                <div className="w-10 h-10 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                  <Users className="h-5 w-5 text-fuchsia-600" />
                 </div>
               </div>
             </Card>
@@ -982,10 +982,10 @@ const AdminAnalytics = () => {
                   </div>
                   <div className="w-2/5 space-y-2">
                     <div className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-fuchsia-500"></div>
                       <div>
                         <div className="font-medium">Johannesburg</div>
-                        <div className="text-purple-600 font-bold">18</div>
+                        <div className="text-fuchsia-600 font-bold">18</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
@@ -1060,11 +1060,11 @@ const AdminAnalytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Avg Booking Value</p>
-                  <p className="text-xl font-bold text-purple-600">R7,850</p>
-                  <p className="text-xs text-purple-500">+12% vs last period</p>
+                  <p className="text-xl font-bold text-fuchsia-600">R7,850</p>
+                  <p className="text-xs text-fuchsia-500">+12% vs last period</p>
                 </div>
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-fuchsia-600" />
                 </div>
               </div>
             </Card>
@@ -1176,11 +1176,11 @@ const AdminAnalytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Monthly Target</p>
-                  <p className="text-lg font-bold text-purple-600">78%</p>
-                  <p className="text-xs text-purple-500">R390k achieved</p>
+                  <p className="text-lg font-bold text-fuchsia-600">78%</p>
+                  <p className="text-xs text-fuchsia-500">R390k achieved</p>
                 </div>
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Star className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                  <Star className="h-4 w-4 text-fuchsia-600" />
                 </div>
               </div>
             </Card>
@@ -1444,7 +1444,7 @@ const AdminAnalytics = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-fuchsia-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center">
                         <Star className="h-3 w-3 text-white" />
@@ -1639,10 +1639,10 @@ const AdminAnalytics = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-fuchsia-500"></div>
                       <div>
                         <div className="font-medium">ECD Training</div>
-                        <div className="text-purple-600 font-bold">18</div>
+                        <div className="text-fuchsia-600 font-bold">18</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
@@ -1701,11 +1701,11 @@ const AdminAnalytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Completion Rate</p>
-                  <p className="text-lg font-bold text-purple-600">96%</p>
-                  <p className="text-xs text-purple-500">Avg across all nannies</p>
+                  <p className="text-lg font-bold text-fuchsia-600">96%</p>
+                  <p className="text-xs text-fuchsia-500">Avg across all nannies</p>
                 </div>
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-fuchsia-600" />
                 </div>
               </div>
             </Card>
@@ -1817,11 +1817,11 @@ const AdminAnalytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Repeat Rate</p>
-                  <p className="text-xl font-bold text-purple-600">87%</p>
-                  <p className="text-xs text-purple-500">Client retention</p>
+                  <p className="text-xl font-bold text-fuchsia-600">87%</p>
+                  <p className="text-xs text-fuchsia-500">Client retention</p>
                 </div>
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Users className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                  <Users className="h-4 w-4 text-fuchsia-600" />
                 </div>
               </div>
             </Card>

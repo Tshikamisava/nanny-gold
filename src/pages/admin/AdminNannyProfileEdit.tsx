@@ -330,7 +330,7 @@ const AdminNannyProfileEdit = () => {
                 />
               ) : (
                 <div 
-                  className="w-24 h-24 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center cursor-pointer hover:opacity-75 transition-opacity border-2 border-border"
+                  className="w-24 h-24 bg-gradient-to-r from-fuchsia-400 to-pink-400 rounded-full flex items-center justify-center cursor-pointer hover:opacity-75 transition-opacity border-2 border-border"
                   onClick={() => setShowPhotoUpload(true)}
                 >
                   <User className="w-12 h-12 text-white" />
@@ -376,7 +376,7 @@ const AdminNannyProfileEdit = () => {
           </div>
         </div>
         
-        <Button onClick={handleSave} disabled={saving} size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+        <Button onClick={handleSave} disabled={saving} size="lg" className="bg-gradient-to-r from-blue-600 to-fuchsia-600 hover:from-blue-700 hover:to-fuchsia-700">
           {saving ? (
             <>
               <Clock className="w-4 h-4 mr-2 animate-spin" />
@@ -397,7 +397,7 @@ const AdminNannyProfileEdit = () => {
         <div className="space-y-6">
           {/* Basic Information */}
           <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-fuchsia-50">
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5 text-blue-600" />
                 Basic Information
@@ -445,9 +445,9 @@ const AdminNannyProfileEdit = () => {
 
           {/* Skills & Qualifications */}
           <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+            <CardHeader className="bg-gradient-to-r from-fuchsia-50 to-pink-50">
               <CardTitle className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-purple-600" />
+                <Award className="w-5 h-5 text-fuchsia-600" />
                 Skills & Qualifications
               </CardTitle>
             </CardHeader>
@@ -634,7 +634,7 @@ const AdminNannyProfileEdit = () => {
           onClick={handleSave} 
           disabled={saving} 
           size="lg" 
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
+          className="bg-gradient-to-r from-blue-600 to-fuchsia-600 hover:from-blue-700 hover:to-fuchsia-700 shadow-lg"
         >
           {saving ? (
             <>

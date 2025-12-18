@@ -63,17 +63,17 @@ export const SupportWorkflowDiagram = () => {
           {/* Step 2: Auto Assignment */}
           <div className="flex items-start gap-4">
             <div className="flex flex-col items-center">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-fuchsia-100 rounded-full flex items-center justify-center">
+                <Bot className="w-5 h-5 text-fuchsia-600" />
               </div>
               <div className="w-px h-12 bg-gray-300 mt-2"></div>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-purple-900 mb-2">2. Auto Assignment</h3>
+              <h3 className="font-semibold text-fuchsia-900 mb-2">2. Auto Assignment</h3>
               <p className="text-sm text-gray-600 mb-3">
                 Database trigger automatically assigns ticket to available admin
               </p>
-              <div className="p-3 bg-purple-50 rounded-lg">
+              <div className="p-3 bg-fuchsia-50 rounded-lg">
                 <h4 className="font-medium text-xs mb-1">auto_assign_support_ticket() Function</h4>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>• Query user_roles table for admins</li>

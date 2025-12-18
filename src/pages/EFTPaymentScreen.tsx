@@ -631,7 +631,7 @@ const EFTPaymentScreen = () => {
                 uploadProofOfPayment();
               }}
               disabled={!proofFile || uploading || !bookingId}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-blue-600 to-fuchsia-600 hover:from-blue-700 hover:to-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? (
                 <>

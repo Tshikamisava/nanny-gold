@@ -426,16 +426,36 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
   const calculateShortTermPricing = (): PricingBreakdown => {
     const cleanedPrefs = cleanPreferences(preferences);
     
-    if (cleanedPrefs.bookingSubType === 'date_night' || cleanedPrefs.bookingSubType === 'emergency') {
-      // Hourly bookings (date night, emergency)
-      let baseHourlyRate = cleanedPrefs.bookingSubType === 'emergency' ? 80 : 120;
+    if (cleanedPrefs.bookingSubType === 'date_night' || cleanedPrefs.bookingSubType === 'emergency' || cleanedPrefs.bookingSubType === 'date_day') {
+      // Hourly bookings (date night, emergency, date day)
+      let baseHourlyRate = 40; // Default date_day rate
+      if (cleanedPrefs.bookingSubType === 'emergency') {
+        baseHourlyRate = 80;
+      } else if (cleanedPrefs.bookingSubType === 'date_night') {
+        baseHourlyRate = 120;
+      }
+      
+      // Check for weekend rate (Friday, Saturday, Sunday) for date_day
+      if (cleanedPrefs.bookingSubType === 'date_day' && cleanedPrefs.selectedDates?.length) {
+        const hasWeekend = cleanedPrefs.selectedDates.some(dateStr => {
+          const date = new Date(dateStr);
+          const dayOfWeek = date.getDay();
+          return dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
+        });
+        if (hasWeekend) {
+          baseHourlyRate = 55; // Weekend rate
+        }
+      }
+      
       const addOns: Array<{ name: string; price: number }> = [];
 
       // Map services using short-term handler pattern
       const lightHousekeeping = cleanedPrefs.householdSupport?.includes('light-housekeeping') || false;
 
       if (cleanedPrefs.cooking) {
-        addOns.push({ name: "Cooking/Food-prep", price: 12 });
+        // Cooking is R100/day for all short-term services
+        const numDays = cleanedPrefs.selectedDates?.length || 1;
+        addOns.push({ name: "Cooking/Food-prep", price: 100 * numDays });
       }
       
       if (cleanedPrefs.specialNeeds) {
@@ -445,17 +465,20 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
       // Light Housekeeping ONLY if selected (daily rate based on home size)
       if (lightHousekeeping && cleanedPrefs.homeSize) {
         const homeSize = cleanedPrefs.homeSize;
-        let housekeepingDailyRate = 150; // Default for family_hub
+        let housekeepingDailyRate = 100; // Default for family_hub
         
         switch (homeSize) {
           case 'pocket_palace':
             housekeepingDailyRate = 80;
             break;
           case 'family_hub':
-            housekeepingDailyRate = 150;
+            housekeepingDailyRate = 100;
             break;
-          case 'grand_retreat':
-            housekeepingDailyRate = 200;
+          case 'grand_estate':
+            housekeepingDailyRate = 120;
+            break;
+          case 'monumental_manor':
+            housekeepingDailyRate = 140;
             break;
           case 'epic_estates':
             housekeepingDailyRate = 300;
@@ -466,16 +489,15 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (cleanedPrefs.drivingSupport) {
-        addOns.push({ name: "Driving Support", price: 25 });
+        addOns.push({ name: "Driving Support", price: 25 }); // This seems wrong, but keeping for now
       }
 
       const totalHours = cleanedPrefs.timeSlots && cleanedPrefs.selectedDates 
         ? calculateTotalHours(cleanedPrefs.timeSlots, cleanedPrefs.selectedDates.length)
-        : getDefaultHours(cleanedPrefs.bookingSubType || 'date_night', cleanedPrefs.selectedDates?.length || 1);
+        : getDefaultHours(cleanedPrefs.bookingSubType || 'date_day', cleanedPrefs.selectedDates?.length || 1);
       
-      const addOnHourlyTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);
-      const effectiveHourlyRate = baseHourlyRate + addOnHourlyTotal;
-      const subtotal = effectiveHourlyRate * totalHours;
+      const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);
+      const subtotal = (baseHourlyRate * totalHours) + addOnTotal;
       const serviceFee = 35;
       const total = subtotal + serviceFee;
 
@@ -487,45 +509,73 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
         isHourly: true,
         subtotal,
         serviceFee,
-        effectiveHourlyRate
+        effectiveHourlyRate: total / totalHours
       };
     } else if (cleanedPrefs.bookingSubType === 'temporary_support') {
-      // Temporary support: daily rates
+      // Gap Coverage: daily rates - R280 weekday, R350 weekend
       const addOns: Array<{ name: string; price: number }> = [];
       
+      // Light Housekeeping based on home size
+      const lightHousekeeping = cleanedPrefs.householdSupport?.includes('light-housekeeping') || false;
+      if (lightHousekeeping && cleanedPrefs.homeSize) {
+        const homeSize = cleanedPrefs.homeSize;
+        let housekeepingDailyRate = 100; // Default
+        
+        switch (homeSize) {
+          case 'pocket_palace':
+            housekeepingDailyRate = 80;
+            break;
+          case 'family_hub':
+            housekeepingDailyRate = 100;
+            break;
+          case 'grand_estate':
+            housekeepingDailyRate = 120;
+            break;
+          case 'monumental_manor':
+            housekeepingDailyRate = 140;
+            break;
+          case 'epic_estates':
+            housekeepingDailyRate = 300;
+            break;
+        }
+        
+        addOns.push({ name: "Light Housekeeping", price: housekeepingDailyRate });
+      }
+      
       if (cleanedPrefs.cooking) {
-        addOns.push({ name: "Cooking/Food-prep", price: 120 });
+        // R100/day for cooking
+        addOns.push({ name: "Cooking/Food-prep", price: 100 });
       }
       
       if (cleanedPrefs.specialNeeds) {
-        addOns.push({ name: "Diverse needs support", price: 200 });
+        addOns.push({ name: "Diverse needs support", price: 0 });
       }
 
       if (cleanedPrefs.drivingSupport) {
-        addOns.push({ name: "Driving Support", price: 200 });
+        addOns.push({ name: "Driving Support", price: 200 }); // This seems inconsistent, but keeping for now
       }
 
       const numberOfDays = cleanedPrefs.selectedDates ? cleanedPrefs.selectedDates.length : 0;
       
-      let total = 0;
+      let baseTotal = 0;
       cleanedPrefs.selectedDates?.forEach((dateStr: string) => {
         const date = new Date(dateStr);
         const dayOfWeek = date.getDay();
         
         if (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6) {
-          total += 350; // Weekend
+          baseTotal += 350; // Weekend
         } else {
-          total += 280; // Weekday
+          baseTotal += 280; // Weekday
         }
       });
       
-      const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);
-      const totalWithAddOns = total + (addOnTotal * numberOfDays);
+      const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0) * numberOfDays;
+      const total = baseTotal + addOnTotal;
 
       return { 
-        baseRate: total / numberOfDays,
+        baseRate: baseTotal / numberOfDays,
         addOns, 
-        total: totalWithAddOns
+        total
       };
     } else {
       // Other short-term daily pricing
@@ -598,8 +648,21 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
     // Add-on services for long-term
     // NOTE: Light housekeeping is INCLUDED in monthly rate, no extra charge
     
+    // Extra children: R500 each after 3rd child
+    const numChildren = cleanedPrefs.childrenAges ? countChildren(cleanedPrefs.childrenAges) : 0;
+    if (numChildren > 3) {
+      const extraChildren = numChildren - 3;
+      addOns.push({ name: `Extra Children (${extraChildren})`, price: extraChildren * 500 });
+    }
+    
+    // Extra adults: R500 each after 2nd adult
+    if (cleanedPrefs.otherDependents && cleanedPrefs.otherDependents > 2) {
+      const extraAdults = cleanedPrefs.otherDependents - 2;
+      addOns.push({ name: `Extra Adult Dependents (${extraAdults})`, price: extraAdults * 500 });
+    }
+    
     if (cleanedPrefs.drivingSupport) {
-      addOns.push({ name: "Driving Support", price: 2000 });
+      addOns.push({ name: "Driving Support", price: 1500 });
     }
     
     if (cleanedPrefs.cooking) {
@@ -623,7 +686,7 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (cleanedPrefs.drivingRequired) {
-      addOns.push({ name: "Transportation Service", price: 2000 });
+      addOns.push({ name: "Transportation Service", price: 1500 });
     }
 
     const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);

@@ -90,11 +90,11 @@ const InterviewsTab = () => {
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-200 to-pink-200 flex items-center justify-center">
-                <User className="w-6 h-6 text-purple-700" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-fuchsia-200 to-pink-200 flex items-center justify-center">
+                <User className="w-6 h-6 text-fuchsia-700" />
               </div>
               <div className="flex-1">
-                <h4 className="font-semibold text-purple-900">{interview.nanny_name}</h4>
+                <h4 className="font-semibold text-fuchsia-900">{interview.nanny_name}</h4>
                 <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
                   <Calendar className="w-4 h-4" />
                   <span>{format(new Date(interview.interview_date), 'MMM dd, yyyy')}</span>
@@ -175,7 +175,7 @@ const InterviewsTab = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-purple-900">Interviews</h2>
+          <h2 className="text-2xl font-bold text-fuchsia-900">Interviews</h2>
           <p className="text-gray-600">Manage your nanny interviews</p>
         </div>
         <Button 
@@ -196,7 +196,7 @@ const InterviewsTab = () => {
                 <Calendar className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-purple-900">{scheduledInterviews.length}</h3>
+                <h3 className="text-xl font-bold text-fuchsia-900">{scheduledInterviews.length}</h3>
                 <p className="text-gray-600 text-sm">Scheduled</p>
               </div>
             </div>
@@ -210,7 +210,7 @@ const InterviewsTab = () => {
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-purple-900">{completedInterviews.length}</h3>
+                <h3 className="text-xl font-bold text-fuchsia-900">{completedInterviews.length}</h3>
                 <p className="text-gray-600 text-sm">Completed</p>
               </div>
             </div>
@@ -224,7 +224,7 @@ const InterviewsTab = () => {
                 <XCircle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-purple-900">{cancelledInterviews.length}</h3>
+                <h3 className="text-xl font-bold text-fuchsia-900">{cancelledInterviews.length}</h3>
                 <p className="text-gray-600 text-sm">Cancelled</p>
               </div>
             </div>
