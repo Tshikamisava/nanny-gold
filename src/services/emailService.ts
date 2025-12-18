@@ -48,6 +48,14 @@ export const sendNannyGoldEmail = async (params: SendEmailParams) => {
       throw new Error('User profile not found');
     }
 
+    console.log('📧 Sending email from NannyGold:', {
+      to: params.to,
+      from: params.from,
+      subject: params.subject,
+      userId: user.id,
+      userRole: profile.role
+    });
+
     const { data, error } = await supabase.functions.invoke('send-nannygold-email', {
       body: {
         ...params,
@@ -56,8 +64,12 @@ export const sendNannyGoldEmail = async (params: SendEmailParams) => {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase function error:', error);
+      throw error;
+    }
 
+    console.log('✅ Email sent successfully:', data);
     return { success: true, data };
   } catch (error) {
     console.error('Error sending NannyGold email:', error);

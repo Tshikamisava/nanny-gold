@@ -35,10 +35,11 @@ const JitsiMeetRoom = ({
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [participantCount, setParticipantCount] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [permissionsGranted, setPermissionsGranted] = useState(false);
-  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState<'good' | 'poor' | 'non-optimal'>('good');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
 
   // Request camera and microphone permissions before initializing Jitsi
   useEffect(() => {
@@ -86,7 +87,32 @@ const JitsiMeetRoom = ({
       }
     };
 
+    // Detect mobile device
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobile(mobile);
+      
+      // Check orientation
+      const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+      setOrientation(orientation);
+    };
+
+    checkMobile();
     requestPermissions();
+
+    // Listen for orientation changes
+    const handleOrientationChange = () => {
+      const newOrientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+      setOrientation(newOrientation);
+    };
+
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+
+    return () => {
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('resize', handleOrientationChange);
+    };
   }, [toast]);
 
   useEffect(() => {
@@ -147,7 +173,7 @@ const JitsiMeetRoom = ({
           configOverwrite: {
             prejoinPageEnabled: true,
             startWithAudioMuted: false,
-            startWithVideoMuted: false,
+            startWithVideoMuted: isMobile, // Start with video muted on mobile
             enableInsecureRoomNameWarning: false,
             enableWelcomePage: false,
             enableClosePage: false,
@@ -158,8 +184,16 @@ const JitsiMeetRoom = ({
             // Enable virtual backgrounds
             disableVirtualBackground: false,
             enableVirtualBackgroundBlur: true,
-            // Toolbar configuration
-            toolbarButtons: [
+            // Mobile-specific settings
+            mobile: {
+              disableTileView: false,
+              enableMobileAudio: true,
+              enableMobileVideo: true,
+            },
+            // Toolbar configuration - simplified for mobile
+            toolbarButtons: isMobile ? [
+              'microphone', 'camera', 'hangup', 'chat', 'tileview'
+            ] : [
               'microphone', 'camera', 'closedcaptions', 'desktop', 
               'fullscreen', 'fodeviceselection', 'hangup', 'profile',
               'chat', 'recording', 'livestreaming', 'etherpad', 'settings',
@@ -169,12 +203,12 @@ const JitsiMeetRoom = ({
             ],
             hideConferenceSubject: false,
             hideConferenceTimer: false,
-            // Video quality settings
+            // Video quality settings - lower for mobile
             constraints: {
               video: {
                 height: {
-                  ideal: 720,
-                  max: 720,
+                  ideal: isMobile ? 480 : 720,
+                  max: isMobile ? 480 : 720,
                   min: 240
                 }
               }
@@ -234,6 +268,17 @@ const JitsiMeetRoom = ({
           setIsVideoOff(event.muted);
         });
 
+        // Screen sharing events
+        apiRef.current.addEventListener('screenSharingStatusChanged', (event: any) => {
+          setIsScreenSharing(event.on);
+        });
+
+        // Recording events
+        apiRef.current.addEventListener('recordingStatusChanged', (event: any) => {
+          setIsRecording(event.on);
+          setRecordingStatus(event.details?.status || null);
+        });
+
         apiRef.current.addEventListener('errorOccurred', (event: any) => {
           console.error('Jitsi error:', event);
           setError('An error occurred during the video call');
@@ -246,6 +291,7 @@ const JitsiMeetRoom = ({
 
         // Connection quality monitoring
         apiRef.current.addEventListener('connectionQualityChanged', (event: any) => {
+          setConnectionQuality(event.quality);
           if (event.quality === 'poor' || event.quality === 'non-optimal') {
             toast({
               title: "Poor Connection",
@@ -339,6 +385,39 @@ const JitsiMeetRoom = ({
     }
   };
 
+  const toggleScreenShare = () => {
+    if (apiRef.current) {
+      try {
+        apiRef.current.executeCommand('toggleShareScreen');
+      } catch (err) {
+        console.error('Error toggling screen share:', err);
+      }
+    }
+  };
+
+  const startRecording = () => {
+    if (apiRef.current) {
+      try {
+        apiRef.current.executeCommand('startRecording', {
+          mode: 'file',
+          shouldShare: true
+        });
+      } catch (err) {
+        console.error('Error starting recording:', err);
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (apiRef.current) {
+      try {
+        apiRef.current.executeCommand('stopRecording', 'file');
+      } catch (err) {
+        console.error('Error stopping recording:', err);
+      }
+    }
+  };
+
   const openSettings = () => {
     if (apiRef.current) {
       try {
@@ -421,12 +500,21 @@ const JitsiMeetRoom = ({
           
           <div ref={jitsiContainerRef} className="w-full rounded-lg overflow-hidden" />
           
+<<<<<<< HEAD
           {/* Enhanced Control Bar */}
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-fuchsia-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg">
+=======
+          {/* Enhanced Control Bar - Mobile Responsive */}
+          <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg ${
+            isMobile ? 'scale-90' : ''
+          }`}>
+>>>>>>> 6addbf92c6d9a82827722495cf1b4d9e7bfae51e
             <Button
               size="sm"
               variant="ghost"
-              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isMuted ? 'bg-red-500/50' : ''}`}
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isMuted ? 'bg-red-500/50' : ''} ${
+                isMobile ? 'h-8 w-8' : ''
+              }`}
               onClick={toggleAudio}
               title={isMuted ? "Unmute" : "Mute"}
             >
@@ -436,7 +524,9 @@ const JitsiMeetRoom = ({
             <Button
               size="sm"
               variant="ghost"
-              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isVideoOff ? 'bg-red-500/50' : ''}`}
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isVideoOff ? 'bg-red-500/50' : ''} ${
+                isMobile ? 'h-8 w-8' : ''
+              }`}
               onClick={toggleVideo}
               title={isVideoOff ? "Turn on camera" : "Turn off camera"}
             >
@@ -448,14 +538,16 @@ const JitsiMeetRoom = ({
             <Button
               size="sm"
               variant="ghost"
-              className="text-white hover:bg-white/20 rounded-full h-10 w-10 p-0"
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${
+                isMobile ? 'h-8 w-8' : ''
+              }`}
               onClick={toggleTileView}
               title="Toggle tile view"
             >
               <Users className="w-4 h-4" />
             </Button>
             
-            {onToggleChat && (
+            {onToggleChat && !isMobile && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -467,25 +559,49 @@ const JitsiMeetRoom = ({
               </Button>
             )}
             
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-white hover:bg-white/20 rounded-full h-10 w-10 p-0"
-              onClick={toggleFullscreen}
-              title="Toggle fullscreen"
-            >
-              <Maximize className="w-4 h-4" />
-            </Button>
-            
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-white hover:bg-white/20 rounded-full h-10 w-10 p-0"
-              onClick={openSettings}
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
+            {!isMobile && (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isScreenSharing ? 'bg-blue-500/50' : ''}`}
+                  onClick={toggleScreenShare}
+                  title={isScreenSharing ? "Stop sharing screen" : "Share screen"}
+                >
+                  <Monitor className="w-4 h-4" />
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isRecording ? 'bg-red-500/50' : ''}`}
+                  onClick={isRecording ? stopRecording : startRecording}
+                  title={isRecording ? "Stop recording" : "Start recording"}
+                >
+                  <Video className="w-4 h-4" />
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white hover:bg-white/20 rounded-full h-10 w-10 p-0"
+                  onClick={toggleFullscreen}
+                  title="Toggle fullscreen"
+                >
+                  <Maximize className="w-4 h-4" />
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white hover:bg-white/20 rounded-full h-10 w-10 p-0"
+                  onClick={openSettings}
+                  title="Settings"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </>
+            )}
 
             <div className="w-px bg-white/30 mx-1" />
             
@@ -497,6 +613,37 @@ const JitsiMeetRoom = ({
             >
               <PhoneOff className="w-4 h-4" />
             </Button>
+          </div>
+
+          {/* Mobile Orientation Warning */}
+          {isMobile && orientation === 'portrait' && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500/90 backdrop-blur-md rounded-lg px-4 py-2 text-white text-sm text-center max-w-xs">
+              <AlertTriangle className="w-4 h-4 mx-auto mb-1" />
+              <p>Rotate to landscape for better video quality</p>
+            </div>
+          )}
+
+          {/* Status Indicators */}
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            {/* Connection Quality Indicator */}
+            {connectionQuality !== 'good' && (
+              <div className={`bg-black/70 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2 text-white text-sm ${
+                connectionQuality === 'poor' ? 'bg-red-500/70' : 'bg-yellow-500/70'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionQuality === 'poor' ? 'bg-red-400' : 'bg-yellow-400'
+                }`} />
+                <span>{connectionQuality === 'poor' ? 'Poor' : 'Unstable'} Connection</span>
+              </div>
+            )}
+
+            {/* Recording Status */}
+            {isRecording && (
+              <div className="bg-red-500/70 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2 text-white text-sm">
+                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+                <span>Recording</span>
+              </div>
+            )}
           </div>
 
           {/* Participant Count Badge */}

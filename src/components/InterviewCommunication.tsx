@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import JitsiMeetRoom from './JitsiMeetRoom';
 import RealtimeChat from './RealtimeChat';
 import { useAuth } from '@/hooks/useAuth';
+import { generateJitsiRoomName } from '@/hooks/useInterviews';
 
 interface InterviewCommunicationProps {
   interview: any;
@@ -78,7 +79,7 @@ const InterviewCommunication = ({ interview, userType }: InterviewCommunicationP
   };
 
   const generateRoomName = () => {
-    return `nannygold-interview-${interview.id}`;
+    return generateJitsiRoomName(interview.id);
   };
 
   const getUserInfo = () => {

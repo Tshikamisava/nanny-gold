@@ -3,10 +3,13 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthContext } from '@/components/AuthProvider';
 
-// Helper function to generate unique Jitsi Meet links
+// Helper function to generate unique Jitsi Meet room names and links
+export const generateJitsiRoomName = (interviewId: string): string => {
+  return `nannygold-interview-${interviewId}`;
+};
+
 export const generateJitsiLink = (interviewId: string): string => {
-  const timestamp = Date.now();
-  const roomName = `nannygold-interview-${interviewId}-${timestamp}`;
+  const roomName = generateJitsiRoomName(interviewId);
   return `https://meet.jit.si/${roomName}`;
 };
 

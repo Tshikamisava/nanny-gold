@@ -10,10 +10,14 @@ import { LazyBookingModificationHistory } from '@/components/LazyBookingModifica
 import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { useBookingRealtime } from '@/hooks/useBookingRealtime';
 
 export default function ClientBookingDetails() {
   const { bookingId } = useParams();
   const navigate = useNavigate();
+
+  // Enable real-time booking updates
+  useBookingRealtime();
 
   const { data: booking, isLoading } = useQuery({
     queryKey: ['booking', bookingId],
