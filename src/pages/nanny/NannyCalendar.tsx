@@ -41,7 +41,7 @@ export default function NannyCalendar() {
   const { user } = useAuth();
   
   // Fetch bookings with client profile joins
-  const { data: bookings = [] } = useQuery({
+  const { data: bookings = [], refetch: refetchBookings } = useQuery({
     queryKey: ['nanny-calendar-bookings', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -84,7 +84,7 @@ export default function NannyCalendar() {
   });
   
   // Fetch interviews with client profile joins
-  const { data: interviews = [] } = useQuery({
+  const { data: interviews = [], refetch: refetchInterviews } = useQuery({
     queryKey: ['nanny-calendar-interviews', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -131,7 +131,7 @@ export default function NannyCalendar() {
         },
         () => {
           // Refetch bookings when changes occur
-          window.location.reload(); // Simple refresh for now
+          refetchBookings();
         }
       )
       .subscribe();
@@ -148,16 +148,16 @@ export default function NannyCalendar() {
         },
         () => {
           // Refetch interviews when changes occur
-          window.location.reload(); // Simple refresh for now
+          refetchInterviews();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(bookingsChannel);
-      supabase.removeChannel(interviewsChannel);
+      bookingsChannel.unsubscribe();
+      interviewsChannel.unsubscribe();
     };
-  }, [user]);
+  }, [user?.id, refetchBookings, refetchInterviews]);
 
   // Block day/hour functions using new hooks
   const handleBlockDay = async () => {

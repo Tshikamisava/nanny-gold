@@ -7,12 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Calendar, DollarSign, Home, MessageSquare, Clock, User, MapPin, Briefcase } from 'lucide-react';
 import { LazyBookingModificationHistory } from '@/components/LazyBookingModificationHistory';
+import { BookingRevenueDisplay } from '@/components/BookingRevenueDisplay';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { useBookingRealtime } from '@/hooks/useBookingRealtime';
 
 export default function ClientBookingDetails() {
   const { bookingId } = useParams();
   const navigate = useNavigate();
+
+  // Enable real-time booking updates
+  useBookingRealtime();
 
   const { data: booking, isLoading } = useQuery({
     queryKey: ['booking', bookingId],
@@ -333,6 +338,23 @@ export default function ClientBookingDetails() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Revenue Breakdown - Transparent Cost Display */}
+      {financials && (
+        <BookingRevenueDisplay
+          bookingType={booking.booking_type as 'short_term' | 'long_term' | 'emergency'}
+          totalCost={booking.total_monthly_cost || 0}
+          baseRate={booking.base_rate || 0}
+          additionalServices={booking.additional_services_cost || 0}
+          placementFee={financials.fixed_fee || 0}
+          commissionPercent={financials.commission_percent || 0}
+          commissionAmount={financials.commission_amount || 0}
+          nannyEarnings={financials.nanny_earnings || 0}
+          adminRevenue={financials.admin_total_revenue || 0}
+          homeSize={booking.home_size}
+          userRole="client"
+        />
       )}
 
       {/* Modification History */}

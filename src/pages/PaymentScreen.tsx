@@ -216,13 +216,13 @@ const PaymentScreen = () => {
   const calculatePlacementFee = (homeSize: string, baseRate: number): number => {
     const mappedSize = homeSize?.toLowerCase().replace(/[- ]/g, '_') || 'family_hub';
     
-    // Flat R2,500 for standard homes and Grand Estate
-    if (['pocket_palace', 'family_hub', 'grand_estate'].includes(mappedSize)) {
+    // Flat R2,500 for standard homes (Pocket Palace, Family Hub)
+    if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
       return 2500;
     }
     
-    // 50% of base rate for premium estates only
-    if (mappedSize === 'monumental_manor' || mappedSize === 'epic_estates') {
+    // 50% of base rate for premium estates (Grand Estate, Monumental Manor, Epic Estates)
+    if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
       return Math.round(baseRate * 0.5);
     }
     
@@ -395,7 +395,7 @@ const PaymentScreen = () => {
           state: { 
             bookingId: existingBookings[0].id,
             pricingData,
-            amount: pricingData?.total, // Explicit amount for EFT screen
+            amount: isLongTermBooking ? placementFee : pricingData?.total, // Explicit amount for EFT screen
             nannyName: selectedNannyName,
             bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
           }
@@ -460,7 +460,7 @@ const PaymentScreen = () => {
         state: { 
           bookingId: booking.id,
           pricingData,
-          amount: pricingData?.total, // Explicit amount for EFT screen
+          amount: isLongTermBooking ? placementFee : pricingData?.total, // Explicit amount for EFT screen
           nannyName: selectedNannyName,
           bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
         }
@@ -740,12 +740,9 @@ const PaymentScreen = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-foreground">Due Today</span>
                     <span className="font-semibold text-secondary text-lg">
-                      R{placementFee.toLocaleString()}
+                      {placementFee.toLocaleString()} placement fee
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Non-refundable placement fee
-                  </p>
                   
                   <div className="flex justify-between items-center">
                     <span className="text-foreground">Reserved (Month-end)</span>
@@ -776,7 +773,7 @@ const PaymentScreen = () => {
                   {isProcessing ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Processing...
-                    </> : `Pay R${placementFee.toLocaleString()}`}
+                    </> : `Pay ${placementFee.toLocaleString()} placement fee`}
                 </Button>
               </> : <div className="text-center py-8">
                 <div className="space-y-4">

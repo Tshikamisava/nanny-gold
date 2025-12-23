@@ -40,6 +40,7 @@ const menuItems = [
   { title: 'Booking Calendar', url: '/admin/booking-calendar', icon: CalendarDays, permission: 'bookings' },
   { title: 'Referral Program', url: '/admin/referral-program', icon: Gift, permission: 'user_management' },
   { title: 'Invoicing & Rewards', url: '/admin/invoicing-rewards', icon: Receipt, permission: 'payments' },
+  { title: 'Invoice Management', url: '/admin/invoice-management', icon: Receipt, permission: 'payments' },
   { title: 'Professional Development', url: '/admin/professional-development', icon: GraduationCap, permission: 'professional_development' },
   { title: 'Support & Disputes', url: '/admin/support', icon: MessageSquare, permission: 'support' },
   { title: 'Onboarding & Verification', url: '/admin/verification', icon: CheckCircle, permission: 'verification' },
@@ -71,11 +72,6 @@ export function AdminSidebar() {
     return currentPath.startsWith(path);
   };
 
-  const getNavClass = (path: string, exact = false) => {
-    const active = isActive(path, exact);
-    return active ? 'bg-muted text-primary font-medium' : 'hover:bg-muted/50';
-  };
-
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-60'} collapsible="icon">
       <SidebarContent>
@@ -90,6 +86,7 @@ export function AdminSidebar() {
                 }
                 
                 // All other sections are accessible to regular admins
+                const active = isActive(item.url, item.exact);
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -97,7 +94,11 @@ export function AdminSidebar() {
                       <NavLink 
                         to={item.url} 
                         end={item.exact}
-                        className={getNavClass(item.url, item.exact)}
+                        className={`flex items-center w-full rounded-lg transition-all ${
+                          active 
+                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                        }`}
                         onClick={handleNavClick}
                       >
                         <item.icon className="w-4 h-4" />

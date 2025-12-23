@@ -10,7 +10,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBooking } from '@/contexts/BookingContext';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { saveClientProfile, ClientProfileData } from '@/services/clientProfileService';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Heart, X } from 'lucide-react';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Heart, X, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface FormData {
   // Auth data
@@ -43,6 +45,9 @@ const SignupWithProfile = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState(0);
   
   const [formData, setFormData] = useState<FormData>({
     // Auth data
@@ -93,7 +98,48 @@ const SignupWithProfile = () => {
     }));
   };
 
+  const checkEmailAvailability = async (email: string) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailAvailable(null);
+      return;
+    }
+
+    setEmailChecking(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking email:', error);
+        setEmailAvailable(null);
+        return;
+      }
+
+      setEmailAvailable(!data);
+    } catch (error) {
+      console.error('Error checking email:', error);
+      setEmailAvailable(null);
+    } finally {
+      setEmailChecking(false);
+    }
+  };
+  };
+
+  const calculatePasswordStrength = (password: string) => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    setPasswordStrength(strength);
+  };
+
   const validateStep1 = () => {
+    // Check all required fields
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
       toast({
         title: "Missing Information",
@@ -103,6 +149,52 @@ const SignupWithProfile = () => {
       return false;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Validate phone format (basic South African format)
+    const phoneRegex = /^[0-9]{10}$/;
+    const cleanPhone = formData.phone.replace(/[\s\-\(\)]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid 10-digit phone number",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Validate password strength
+    if (formData.password.length < 8) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Check for at least one number and one letter
+    const hasNumber = /\d/.test(formData.password);
+    const hasLetter = /[a-zA-Z]/.test(formData.password);
+    if (!hasNumber || !hasLetter) {
+      toast({
+        title: "Weak Password",
+        description: "Password must contain both letters and numbers",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Check password match
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -246,35 +338,67 @@ const SignupWithProfile = () => {
           className="rounded-xl border-border focus:border-primary"
         />
         
-        <Input
-          type="email"
-          placeholder="Email Address"
-          value={formData.email}
-          onChange={(e) => updateForm('email', e.target.value)}
-          className="rounded-xl border-border focus:border-primary"
-        />
-        
         <div className="relative">
           <Input
-            type={showPassword ? "text" : "password"}
-            placeholder="Password"
-            value={formData.password}
-            onChange={(e) => updateForm('password', e.target.value)}
+            type="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={(e) => {
+              updateForm('email', e.target.value);
+              const timeout = setTimeout(() => checkEmailAvailability(e.target.value), 500);
+              return () => clearTimeout(timeout);
+            }}
             className="rounded-xl border-border focus:border-primary pr-10"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
+          {emailChecking && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!emailChecking && emailAvailable === true && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <Check className="h-4 w-4 text-green-500" />
+            </div>
+          )}
+          {!emailChecking && emailAvailable === false && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </div>
+          )}
+          {emailAvailable === false && (
+            <p className="text-xs text-destructive mt-1">This email is already registered</p>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={formData.password}
+              onChange={(e) => {
+                updateForm('password', e.target.value);
+                calculatePasswordStrength(e.target.value);
+              }}
+              className="rounded-xl border-border focus:border-primary pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
+          {formData.password && (
+            <PasswordStrengthIndicator password={formData.password} />
+          )}
         </div>
 
         <div className="relative">
@@ -298,14 +422,39 @@ const SignupWithProfile = () => {
               <Eye className="h-4 w-4 text-muted-foreground" />
             )}
           </Button>
+          {formData.confirmPassword && (
+            <div className="absolute right-12 top-1/2 -translate-y-1/2">
+              {formData.password === formData.confirmPassword ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <X className="h-4 w-4 text-destructive" />
+              )}
+            </div>
+          )}
         </div>
+        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+          <p className="text-xs text-destructive">Passwords do not match</p>
+        )}
         
         <Button
           onClick={handleNextStep}
-          className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
+          disabled={!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || emailAvailable === false || formData.password !== formData.confirmPassword}
+          className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next Step <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
+        
+        <div className="text-center mt-4">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <button
+              onClick={() => navigate('/login')}
+              className="text-primary hover:underline font-medium"
+            >
+              Sign in
+            </button>
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -484,10 +633,17 @@ const SignupWithProfile = () => {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading}
-            className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
+            disabled={loading || !formData.location || formData.childrenAges.filter(age => age.trim()).length === 0}
+            className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Creating Account..." : "Complete Signup"}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              "Complete Signup"
+            )}
           </Button>
         </div>
       </CardContent>

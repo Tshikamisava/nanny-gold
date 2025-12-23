@@ -21,12 +21,20 @@ import { formatCurrency } from '@/utils/pricingUtils';
 import { formatLocation } from '@/utils/locationFormatter';
 import { useToast } from '@/hooks/use-toast';
 import { BookingWithRelations } from '@/types/booking';
+import { useBookingRealtime } from '@/hooks/useBookingRealtime';
 
 type BookingRequest = BookingWithRelations;
 
 export default function NannyBookingsManagement() {
   const { user } = useAuthContext();
   const { toast } = useToast();
+
+  // Enable real-time booking updates for nanny
+  useBookingRealtime({
+    onBookingInsert: () => loadBookings(),
+    onBookingUpdate: () => loadBookings(),
+    onBookingDelete: () => loadBookings()
+  });
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');

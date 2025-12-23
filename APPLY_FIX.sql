@@ -1,0 +1,139 @@
+-- Apply this SQL in Supabase Dashboard > SQL Editor
+
+-- Step 1: Fix the calculate_booking_revenue function
+CREATE OR REPLACE FUNCTION public.calculate_booking_revenue(
+  p_booking_id uuid, 
+  p_total_amount numeric, 
+  p_booking_type text, 
+  p_monthly_rate_estimate numeric DEFAULT NULL::numeric,
+  p_home_size text DEFAULT NULL::text
+)
+RETURNS TABLE(
+  fixed_fee numeric, 
+  commission_percent numeric, 
+  commission_amount numeric, 
+  admin_total_revenue numeric, 
+  nanny_earnings numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_fixed_fee DECIMAL := 0;
+  v_commission_percent DECIMAL := 0;
+  v_commission_amount DECIMAL := 0;
+  v_admin_total_revenue DECIMAL := 0;
+  v_nanny_earnings DECIMAL := 0;
+  v_monthly_rate DECIMAL := 0;
+BEGIN
+  -- Use monthly rate estimate or total amount as monthly rate
+  v_monthly_rate := COALESCE(p_monthly_rate_estimate, p_total_amount);
+  
+  IF p_booking_type = 'long_term' THEN
+    -- Placement fee calculation based on home size
+    IF p_home_size IN ('Grand Retreat', 'Epic Estates') THEN
+      -- Premium homes: 50% of monthly rate as placement fee
+      v_fixed_fee := v_monthly_rate * 0.50;
+    ELSE
+      -- Standard homes (Pocket Palace, Family Hub): Fixed R2,500 placement fee
+      v_fixed_fee := 2500.00;
+    END IF;
+    
+    -- Commission calculation on FULL monthly rate (sliding scale)
+    IF v_monthly_rate >= 10000 THEN
+      v_commission_percent := 25; -- Premium homes: 25%
+    ELSIF v_monthly_rate <= 5000 THEN
+      v_commission_percent := 10; -- Budget homes: 10%
+    ELSE
+      v_commission_percent := 15; -- Standard homes: 15%
+    END IF;
+    
+    -- Commission is calculated on the full monthly rate
+    v_commission_amount := v_monthly_rate * (v_commission_percent / 100);
+    
+    -- Admin total revenue = placement fee + commission
+    v_admin_total_revenue := v_fixed_fee + v_commission_amount;
+    
+    -- Nanny earnings = monthly rate minus commission (placement fee doesn't affect nanny)
+    v_nanny_earnings := v_monthly_rate - v_commission_amount;
+    
+  ELSE
+    -- Short-term bookings: R35 per day of booking
+    -- Get number of days from booking
+    DECLARE
+      booking_days INTEGER := 1;
+    BEGIN
+      SELECT COALESCE(
+        (SELECT DATE_PART('day', b.end_date - b.start_date) + 1 FROM public.bookings b WHERE b.id = p_booking_id),
+        1
+      ) INTO booking_days;
+      
+      v_fixed_fee := 35 * booking_days;
+      v_commission_percent := 20; -- Flat 20% for short-term
+      
+      -- Commission on the total amount minus fixed fee
+      v_commission_amount := (p_total_amount - v_fixed_fee) * (v_commission_percent / 100);
+      v_admin_total_revenue := v_fixed_fee + v_commission_amount;
+      
+      -- FIX: Nanny earnings should subtract BOTH fixed fee and commission
+      v_nanny_earnings := p_total_amount - v_fixed_fee - v_commission_amount;
+    END;
+  END IF;
+
+  RETURN QUERY SELECT v_fixed_fee, v_commission_percent, v_commission_amount, v_admin_total_revenue, v_nanny_earnings;
+END;
+$function$;
+
+-- Step 2: Update any existing booking_financials records that have negative nanny_earnings
+UPDATE booking_financials bf
+SET nanny_earnings = b.total_monthly_cost - bf.fixed_fee - bf.commission_amount,
+    updated_at = NOW()
+FROM bookings b
+WHERE bf.booking_id = b.id
+  AND bf.nanny_earnings < 0;
+
+-- Step 3: Recalculate ALL booking financials to ensure consistency
+DO $$
+DECLARE
+  booking_record RECORD;
+  calc_result RECORD;
+BEGIN
+  FOR booking_record IN 
+    SELECT id, total_monthly_cost, booking_type, home_size 
+    FROM bookings 
+    WHERE id IN (SELECT booking_id FROM booking_financials)
+  LOOP
+    -- Call the fixed function
+    SELECT * INTO calc_result 
+    FROM calculate_booking_revenue(
+      booking_record.id,
+      booking_record.total_monthly_cost,
+      booking_record.booking_type,
+      booking_record.total_monthly_cost,
+      booking_record.home_size
+    );
+    
+    -- Update booking_financials with correct values
+    UPDATE booking_financials
+    SET 
+      fixed_fee = calc_result.fixed_fee,
+      commission_percent = calc_result.commission_percent,
+      commission_amount = calc_result.commission_amount,
+      admin_total_revenue = calc_result.admin_total_revenue,
+      nanny_earnings = calc_result.nanny_earnings,
+      updated_at = NOW()
+    WHERE booking_id = booking_record.id;
+    
+  END LOOP;
+  
+  RAISE NOTICE 'Successfully recalculated financials for all bookings';
+END $$;
+
+-- Step 4: Verify no negative earnings remain
+SELECT 
+  COUNT(*) as bookings_with_negative_earnings
+FROM booking_financials
+WHERE nanny_earnings < 0;
+
+-- This should return 0

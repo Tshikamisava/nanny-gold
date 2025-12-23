@@ -30,10 +30,19 @@ interface BookingModificationDialogProps {
 }
 
 const serviceOptions = [
-  { id: 'cooking', name: SERVICE_PRICING.cooking.name, monthlyRate: SERVICE_PRICING.cooking.price, description: SERVICE_PRICING.cooking.description },
-  { id: 'driving_support', name: SERVICE_PRICING.driving_support.name, monthlyRate: SERVICE_PRICING.driving_support.price, description: SERVICE_PRICING.driving_support.description },
-  { id: 'special_needs', name: SERVICE_PRICING.special_needs.name, monthlyRate: SERVICE_PRICING.special_needs.price, description: SERVICE_PRICING.special_needs.description },
-  { id: 'backup_nanny', name: SERVICE_PRICING.backup_nanny.name, monthlyRate: SERVICE_PRICING.backup_nanny.price, description: SERVICE_PRICING.backup_nanny.description },
+  { id: 'cooking', name: 'Cooking', monthlyRate: SERVICE_PRICING.add_ons.cooking.long_term_monthly, description: 'Meal preparation and cooking' },
+  { id: 'driving_support', name: 'Driving Support', monthlyRate: SERVICE_PRICING.add_ons.driving.long_term_monthly, description: 'Transportation assistance' },
+  { id: 'special_needs', name: 'Diverse Ability Support', monthlyRate: SERVICE_PRICING.add_ons.diverse_ability.long_term_monthly, description: 'Specialized care for children or other dependants with diverse abilities' },
+  // Backup nanny might not be in new pricing explicitly as an add-on with price? 
+  // Checking servicePricing.ts: backup_nanny is NOT in the new add_ons list I created in Step 47.
+  // I should probably remove it or add it to constants if needed. 
+  // For now I will comment it out or assume it's custom.
+  // The requirements didn't explicitly list "Backup Nanny" price in Long Term add-ons. 
+  // It listed: Diverse Ability, Cooking, Driving, Child > 3, Adult > 2.
+  // I will omit backup_nanny for now or give it a placeholder if critical. 
+  // The previous price was R100/month. 
+  // I'll keep it as legacy if needed but better to remove if not in requirements.
+  // I will remove it from the list.
 ];
 
 export const BookingModificationDialog: React.FC<BookingModificationDialogProps> = ({
@@ -46,11 +55,11 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const currentServices = booking.services ? 
+  const currentServices = booking.services ?
     Object.entries(booking.services)
       .filter(([key, value]) => value === true)
       .map(([key]) => key) : [];
-  
+
   const availableServicesToAdd = serviceOptions.filter(
     service => !currentServices.includes(service.id)
   );
@@ -61,28 +70,28 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
 
   const calculateAdjustment = () => {
     if (!selectedServices.length) return 0;
-    
+
     const selectedServiceRates = serviceOptions
       .filter(service => selectedServices.includes(service.id))
       .reduce((total, service) => total + service.monthlyRate, 0);
-    
+
     // Prorate for remaining days in current month (simplified to 30 days)
     const today = new Date();
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     const daysRemaining = Math.ceil((endOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     const prorationFactor = daysRemaining / 30;
-    
+
     const adjustment = selectedServiceRates * prorationFactor;
     return modificationType === 'remove_services' ? -adjustment : adjustment;
   };
 
   const calculateFullServiceAmount = () => {
     if (!selectedServices.length) return 0;
-    
+
     const selectedServiceRates = serviceOptions
       .filter(service => selectedServices.includes(service.id))
       .reduce((total, service) => total + service.monthlyRate, 0);
-    
+
     return modificationType === 'remove_services' ? -selectedServiceRates : selectedServiceRates;
   };
 
@@ -112,11 +121,11 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
       const modification = {
         booking_id: booking.id,
         client_id: user.id,
-        modification_type: modificationType === 'add_services' ? 'service_addition' : 
-                          modificationType === 'remove_services' ? 'service_removal' : 'cancellation',
-        old_values: modificationType === 'remove_services' ? 
+        modification_type: modificationType === 'add_services' ? 'service_addition' :
+          modificationType === 'remove_services' ? 'service_removal' : 'cancellation',
+        old_values: modificationType === 'remove_services' ?
           selectedServices.reduce((acc, serviceId) => ({ ...acc, [serviceId]: true }), {}) : {},
-        new_values: modificationType === 'add_services' ? 
+        new_values: modificationType === 'add_services' ?
           selectedServices.reduce((acc, serviceId) => ({ ...acc, [serviceId]: true }), {}) : {},
         price_adjustment: calculateAdjustment(),
         notes,
@@ -146,7 +155,7 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
 
   const isUpcoming = new Date(booking.start_date) > new Date();
   const today = new Date();
-  
+
   // Determine if this is a single day/night booking (only 1 day duration)
   const isSingleDayBooking = () => {
     if (!booking.end_date) {
@@ -156,16 +165,16 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
     const duration = Math.ceil((new Date(booking.end_date).getTime() - new Date(booking.start_date).getTime()) / (1000 * 60 * 60 * 24));
     return duration <= 1;
   };
-  
+
   // Check if this is a long-term booking
   const isLongTermBooking = booking.booking_type === 'long_term';
-  
+
   // Modification rules:
   // - Long-term bookings: always allow modifications if status is valid
   // - Short-term 1 day/night: only before booking starts
   // - Short-term 2+ days/nights: allow modifications even if active
-  const canModify = (booking.status === 'confirmed' || booking.status === 'pending' || 
-                     (booking.status === 'active' && isLongTermBooking)) && 
+  const canModify = (booking.status === 'confirmed' || booking.status === 'pending' ||
+    (booking.status === 'active' && isLongTermBooking)) &&
     (isLongTermBooking || !isSingleDayBooking() || isUpcoming);
 
   return (
@@ -221,14 +230,14 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
           {!canModify && (
             <Card className="border-orange-200 bg-orange-50">
               <CardContent className="pt-6">
-                  <p className="text-orange-800">
-                    {(booking.status !== 'confirmed' && booking.status !== 'pending') 
-                      ? `This booking cannot be modified because its status is "${booking.status}".`
-                      : isSingleDayBooking() && !isUpcoming
+                <p className="text-orange-800">
+                  {(booking.status !== 'confirmed' && booking.status !== 'pending')
+                    ? `This booking cannot be modified because its status is "${booking.status}".`
+                    : isSingleDayBooking() && !isUpcoming
                       ? 'Single day/night bookings cannot be modified once they have started.'
                       : 'This booking cannot be modified at this time.'
-                    }
-                  </p>
+                  }
+                </p>
               </CardContent>
             </Card>
           )}
@@ -267,10 +276,9 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
                 <CardContent className="space-y-4">
                   <div className="grid gap-3">
                     {availableServicesToAdd.length > 0 && (
-                      <div 
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          modificationType === 'add_services' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      <div
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${modificationType === 'add_services' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                          }`}
                         onClick={() => {
                           setModificationType('add_services');
                           setSelectedServices([]);
@@ -289,10 +297,9 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
                     )}
 
                     {availableServicesToRemove.length > 0 && (
-                      <div 
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          modificationType === 'remove_services' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      <div
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${modificationType === 'remove_services' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                          }`}
                         onClick={() => {
                           setModificationType('remove_services');
                           setSelectedServices([]);
@@ -311,10 +318,9 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
                     )}
 
                     {isUpcoming && (
-                      <div 
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          modificationType === 'cancel' ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      <div
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${modificationType === 'cancel' ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                          }`}
                         onClick={() => {
                           setModificationType('cancel');
                           setSelectedServices([]);
@@ -381,43 +387,43 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
                       Price Adjustment Preview
                     </CardTitle>
                   </CardHeader>
-                   <CardContent>
-                     <div className="space-y-4">
-                       {/* Current billing amount */}
-                       <div className="flex justify-between text-sm">
-                         <span className="text-muted-foreground">Current Monthly Total:</span>
-                         <span>R{booking.total_monthly_cost.toFixed(2)}</span>
-                       </div>
-                       
-                       {/* Prorated adjustment */}
-                       <div className="flex justify-between text-lg font-medium">
-                         <span>Adjustment Amount (Prorated):</span>
-                         <span className={calculateAdjustment() >= 0 ? 'text-red-600' : 'text-green-600'}>
-                           {calculateAdjustment() >= 0 ? '+' : ''}R{calculateAdjustment().toFixed(2)}
-                         </span>
-                       </div>
-                       
-                       <Separator />
-                       
-                       {/* Next billing cycle total */}
-                       <div className="flex justify-between text-lg font-semibold">
-                         <span>Next Billing Cycle Total:</span>
-                         <span className="text-primary">R{calculateNextBillingTotal().toFixed(2)}</span>
-                       </div>
-                       
-                       <Separator />
-                       
-                       {/* Ongoing monthly total */}
-                       <div className="flex justify-between text-lg font-semibold">
-                         <span>Ongoing Monthly Total:</span>
-                         <span className="text-primary">R{calculateOngoingMonthlyTotal().toFixed(2)}</span>
-                       </div>
-                       
-                       <div className="text-sm text-muted-foreground space-y-1">
-                         <p>• Next billing cycle includes prorated charges for remaining days</p>
-                         <p>• Subsequent months will be charged the full ongoing monthly amount</p>
-                       </div>
-                     </div>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Current billing amount */}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Current Monthly Total:</span>
+                        <span>R{booking.total_monthly_cost.toFixed(2)}</span>
+                      </div>
+
+                      {/* Prorated adjustment */}
+                      <div className="flex justify-between text-lg font-medium">
+                        <span>Adjustment Amount (Prorated):</span>
+                        <span className={calculateAdjustment() >= 0 ? 'text-red-600' : 'text-green-600'}>
+                          {calculateAdjustment() >= 0 ? '+' : ''}R{calculateAdjustment().toFixed(2)}
+                        </span>
+                      </div>
+
+                      <Separator />
+
+                      {/* Next billing cycle total */}
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>Next Billing Cycle Total:</span>
+                        <span className="text-primary">R{calculateNextBillingTotal().toFixed(2)}</span>
+                      </div>
+
+                      <Separator />
+
+                      {/* Ongoing monthly total */}
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>Ongoing Monthly Total:</span>
+                        <span className="text-primary">R{calculateOngoingMonthlyTotal().toFixed(2)}</span>
+                      </div>
+
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>• Next billing cycle includes prorated charges for remaining days</p>
+                        <p>• Subsequent months will be charged the full ongoing monthly amount</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -442,7 +448,7 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
 
               {/* Submit Button */}
               <div className="flex gap-3 pt-4">
-                <Button 
+                <Button
                   onClick={handleSubmit}
                   disabled={!modificationType || (!selectedServices.length && modificationType !== 'cancel') || isSubmitting}
                   className="flex-1"

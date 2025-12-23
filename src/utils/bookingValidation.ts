@@ -305,3 +305,144 @@ export const getNextEmergencyBookingWindow = () => {
   
   return nextWindow;
 };
+
+/**
+ * ✅ Enhanced: Validates stored booking for dashboard and calendar display
+ */
+export const validateStoredBooking = (booking: any): {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  missingFields: string[];
+} => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const missingFields: string[] = [];
+
+  // Critical field validation
+  if (!booking.client_id) {
+    errors.push('Missing client_id');
+    missingFields.push('client_id');
+  }
+
+  if (!booking.nanny_id) {
+    errors.push('Missing nanny_id');
+    missingFields.push('nanny_id');
+  }
+
+  if (!booking.start_date) {
+    errors.push('Missing start_date');
+    missingFields.push('start_date');
+  }
+
+  if (!booking.booking_type) {
+    errors.push('Missing booking_type');
+    missingFields.push('booking_type');
+  }
+
+  if (!booking.status) {
+    errors.push('Missing status');
+    missingFields.push('status');
+  }
+
+  // Validate schedule data for calendar display
+  if (!booking.schedule || typeof booking.schedule !== 'object') {
+    warnings.push('Missing or invalid schedule data - calendar may not display correctly');
+    missingFields.push('schedule');
+  } else {
+    // Check for time information
+    const hasTimeSlots = booking.schedule.timeSlots && Array.isArray(booking.schedule.timeSlots);
+    const hasDefaultTime = booking.schedule.defaultStartTime;
+    const hasWorkingHours = booking.schedule.workingHours;
+    
+    if (!hasTimeSlots && !hasDefaultTime && !hasWorkingHours) {
+      warnings.push('Schedule missing time information - using default times');
+      missingFields.push('schedule.timeSlots/defaultStartTime/workingHours');
+    }
+  }
+
+  // Validate services data for dashboard display
+  if (!booking.services || typeof booking.services !== 'object') {
+    warnings.push('Missing services data - dashboard may show incomplete information');
+    missingFields.push('services');
+  }
+
+  // Financial data validation
+  if (booking.base_rate === undefined || booking.base_rate === null) {
+    warnings.push('Missing base_rate - pricing information incomplete');
+    missingFields.push('base_rate');
+  }
+
+  if (booking.total_monthly_cost === undefined || booking.total_monthly_cost === null) {
+    warnings.push('Missing total_monthly_cost - pricing information incomplete');
+    missingFields.push('total_monthly_cost');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    missingFields
+  };
+};
+
+/**
+ * ✅ Enhanced: Extracts time information from booking for calendar display
+ */
+export const extractBookingTimeInfo = (booking: any): { start: string; end: string; hasValidTime: boolean } => {
+  const defaultTime = { start: '09:00', end: '17:00', hasValidTime: false };
+
+  if (!booking.schedule) {
+    return defaultTime;
+  }
+
+  // Check for timeSlots (short-term bookings)
+  if (booking.schedule.timeSlots && Array.isArray(booking.schedule.timeSlots) && booking.schedule.timeSlots.length > 0) {
+    return {
+      start: booking.schedule.timeSlots[0].start || booking.schedule.defaultStartTime || '09:00',
+      end: booking.schedule.timeSlots[0].end || booking.schedule.defaultEndTime || '17:00',
+      hasValidTime: true
+    };
+  }
+
+  // Check for default time ranges
+  if (booking.schedule.defaultStartTime) {
+    return {
+      start: booking.schedule.defaultStartTime,
+      end: booking.schedule.defaultEndTime || '17:00',
+      hasValidTime: true
+    };
+  }
+
+  // Check for working hours (long-term bookings)
+  if (booking.schedule.workingHours) {
+    return {
+      start: booking.schedule.workingHours.start || '08:00',
+      end: booking.schedule.workingHours.end || '17:00',
+      hasValidTime: true
+    };
+  }
+
+  return defaultTime;
+};
+
+/**
+ * ✅ Enhanced: Gets booking type description for display
+ */
+export const getBookingTypeLabel = (bookingType: string, livingArrangement?: string): string => {
+  switch (bookingType) {
+    case 'date_night':
+      return 'Date Night Childcare';
+    case 'date_day':
+      return 'Day Childcare';
+    case 'school_holiday':
+      return 'School Holiday Care';
+    case 'emergency':
+      return 'Emergency Childcare';
+    case 'long_term':
+      const arrangement = livingArrangement === 'live-in' ? 'Live-in' : 'Live-out';
+      return `${arrangement} Childcare`;
+    default:
+      return 'Childcare Session';
+  }
+};
