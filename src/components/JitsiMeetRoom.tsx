@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Video, VideoOff, Mic, MicOff, PhoneOff, MessageCircle, Users, Settings, Maximize, Loader2, AlertCircle } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, PhoneOff, MessageCircle, Users, Settings, Maximize, Loader2, AlertCircle, Monitor, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -18,9 +18,9 @@ interface JitsiMeetRoomProps {
   height?: number;
 }
 
-const JitsiMeetRoom = ({ 
-  roomName, 
-  userInfo, 
+const JitsiMeetRoom = ({
+  roomName,
+  userInfo,
   onEndCall,
   onToggleChat,
   className = "",
@@ -30,7 +30,7 @@ const JitsiMeetRoom = ({
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -41,22 +41,30 @@ const JitsiMeetRoom = ({
   const [isMobile, setIsMobile] = useState(false);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
 
+  // Missing state variables
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [participantCount, setParticipantCount] = useState(1);
+  // recordingStatus unused
+  // const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // Request camera and microphone permissions before initializing Jitsi
   useEffect(() => {
     const requestPermissions = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
         });
-        
+
         // Permissions granted
         setPermissionsGranted(true);
         setPermissionError(null);
-        
+
         // Stop the stream as we just needed to get permissions
         stream.getTracks().forEach(track => track.stop());
-        
+
         toast({
           title: "Permissions Granted",
           description: "Camera and microphone access enabled.",
@@ -64,7 +72,7 @@ const JitsiMeetRoom = ({
       } catch (err: any) {
         console.error('Permission error:', err);
         setPermissionError(err.message || 'Permission denied');
-        
+
         if (err.name === 'NotAllowedError') {
           toast({
             title: "Permission Denied",
@@ -91,7 +99,7 @@ const JitsiMeetRoom = ({
     const checkMobile = () => {
       const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       setIsMobile(mobile);
-      
+
       // Check orientation
       const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
       setOrientation(orientation);
@@ -132,7 +140,7 @@ const JitsiMeetRoom = ({
       const script = document.createElement('script');
       script.src = 'https://meet.jit.si/external_api.js';
       script.async = true;
-      
+
       script.onload = () => {
         if (!cleanup) {
           initializeJitsi();
@@ -194,7 +202,7 @@ const JitsiMeetRoom = ({
             toolbarButtons: isMobile ? [
               'microphone', 'camera', 'hangup', 'chat', 'tileview'
             ] : [
-              'microphone', 'camera', 'closedcaptions', 'desktop', 
+              'microphone', 'camera', 'closedcaptions', 'desktop',
               'fullscreen', 'fodeviceselection', 'hangup', 'profile',
               'chat', 'recording', 'livestreaming', 'etherpad', 'settings',
               'raisehand', 'videoquality', 'filmstrip', 'feedback',
@@ -248,7 +256,7 @@ const JitsiMeetRoom = ({
           onEndCall?.();
         });
 
-        apiRef.current.addEventListener('participantJoined', (event: any) => {
+        apiRef.current.addEventListener('participantJoined', (event: { displayName: string }) => {
           setParticipantCount(prev => prev + 1);
           toast({
             title: "Participant Joined",
@@ -256,30 +264,30 @@ const JitsiMeetRoom = ({
           });
         });
 
-        apiRef.current.addEventListener('participantLeft', (event: any) => {
+        apiRef.current.addEventListener('participantLeft', (_event: object) => {
           setParticipantCount(prev => Math.max(1, prev - 1));
         });
 
-        apiRef.current.addEventListener('audioMuteStatusChanged', (event: any) => {
+        apiRef.current.addEventListener('audioMuteStatusChanged', (event: { muted: boolean }) => {
           setIsMuted(event.muted);
         });
 
-        apiRef.current.addEventListener('videoMuteStatusChanged', (event: any) => {
+        apiRef.current.addEventListener('videoMuteStatusChanged', (event: { muted: boolean }) => {
           setIsVideoOff(event.muted);
         });
 
         // Screen sharing events
-        apiRef.current.addEventListener('screenSharingStatusChanged', (event: any) => {
+        apiRef.current.addEventListener('screenSharingStatusChanged', (event: { on: boolean }) => {
           setIsScreenSharing(event.on);
         });
 
         // Recording events
-        apiRef.current.addEventListener('recordingStatusChanged', (event: any) => {
+        apiRef.current.addEventListener('recordingStatusChanged', (event: { on: boolean; details?: { status: string } }) => {
           setIsRecording(event.on);
-          setRecordingStatus(event.details?.status || null);
+          // setRecordingStatus(event.details?.status || null);
         });
 
-        apiRef.current.addEventListener('errorOccurred', (event: any) => {
+        apiRef.current.addEventListener('errorOccurred', (event: object) => {
           console.error('Jitsi error:', event);
           setError('An error occurred during the video call');
           toast({
@@ -290,8 +298,8 @@ const JitsiMeetRoom = ({
         });
 
         // Connection quality monitoring
-        apiRef.current.addEventListener('connectionQualityChanged', (event: any) => {
-          setConnectionQuality(event.quality);
+        apiRef.current.addEventListener('connectionQualityChanged', (event: { quality: string }) => {
+          setConnectionQuality(event.quality as 'good' | 'poor' | 'non-optimal');
           if (event.quality === 'poor' || event.quality === 'non-optimal') {
             toast({
               title: "Poor Connection",
@@ -447,8 +455,8 @@ const JitsiMeetRoom = ({
               </ol>
             </AlertDescription>
           </Alert>
-          <Button 
-            onClick={() => window.location.reload()} 
+          <Button
+            onClick={() => window.location.reload()}
             className="mt-4 w-full"
           >
             Reload Page
@@ -468,8 +476,8 @@ const JitsiMeetRoom = ({
               {error}
             </AlertDescription>
           </Alert>
-          <Button 
-            onClick={() => window.location.reload()} 
+          <Button
+            onClick={() => window.location.reload()}
             className="mt-4 w-full"
             variant="outline"
           >
@@ -497,36 +505,28 @@ const JitsiMeetRoom = ({
               </div>
             </div>
           )}
-          
+
           <div ref={jitsiContainerRef} className="w-full rounded-lg overflow-hidden" />
-          
-<<<<<<< HEAD
-          {/* Enhanced Control Bar */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-fuchsia-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg">
-=======
+
           {/* Enhanced Control Bar - Mobile Responsive */}
-          <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg ${
-            isMobile ? 'scale-90' : ''
-          }`}>
->>>>>>> 6addbf92c6d9a82827722495cf1b4d9e7bfae51e
+          <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg ${isMobile ? 'scale-90' : ''
+            }`}>
             <Button
               size="sm"
               variant="ghost"
-              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isMuted ? 'bg-red-500/50' : ''} ${
-                isMobile ? 'h-8 w-8' : ''
-              }`}
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isMuted ? 'bg-red-500/50' : ''} ${isMobile ? 'h-8 w-8' : ''
+                }`}
               onClick={toggleAudio}
               title={isMuted ? "Unmute" : "Mute"}
             >
               {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </Button>
-            
+
             <Button
               size="sm"
               variant="ghost"
-              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isVideoOff ? 'bg-red-500/50' : ''} ${
-                isMobile ? 'h-8 w-8' : ''
-              }`}
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isVideoOff ? 'bg-red-500/50' : ''} ${isMobile ? 'h-8 w-8' : ''
+                }`}
               onClick={toggleVideo}
               title={isVideoOff ? "Turn on camera" : "Turn off camera"}
             >
@@ -534,19 +534,18 @@ const JitsiMeetRoom = ({
             </Button>
 
             <div className="w-px bg-white/30 mx-1" />
-            
+
             <Button
               size="sm"
               variant="ghost"
-              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${
-                isMobile ? 'h-8 w-8' : ''
-              }`}
+              className={`text-white hover:bg-white/20 rounded-full h-10 w-10 p-0 ${isMobile ? 'h-8 w-8' : ''
+                }`}
               onClick={toggleTileView}
               title="Toggle tile view"
             >
               <Users className="w-4 h-4" />
             </Button>
-            
+
             {onToggleChat && !isMobile && (
               <Button
                 size="sm"
@@ -558,7 +557,7 @@ const JitsiMeetRoom = ({
                 <MessageCircle className="w-4 h-4" />
               </Button>
             )}
-            
+
             {!isMobile && (
               <>
                 <Button
@@ -570,7 +569,7 @@ const JitsiMeetRoom = ({
                 >
                   <Monitor className="w-4 h-4" />
                 </Button>
-                
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -580,7 +579,7 @@ const JitsiMeetRoom = ({
                 >
                   <Video className="w-4 h-4" />
                 </Button>
-                
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -590,7 +589,7 @@ const JitsiMeetRoom = ({
                 >
                   <Maximize className="w-4 h-4" />
                 </Button>
-                
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -604,7 +603,7 @@ const JitsiMeetRoom = ({
             )}
 
             <div className="w-px bg-white/30 mx-1" />
-            
+
             <Button
               size="sm"
               className="bg-red-500 hover:bg-red-600 text-white rounded-full h-10 w-10 p-0"
@@ -627,12 +626,10 @@ const JitsiMeetRoom = ({
           <div className="absolute top-4 left-4 flex flex-col gap-2">
             {/* Connection Quality Indicator */}
             {connectionQuality !== 'good' && (
-              <div className={`bg-black/70 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2 text-white text-sm ${
-                connectionQuality === 'poor' ? 'bg-red-500/70' : 'bg-yellow-500/70'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  connectionQuality === 'poor' ? 'bg-red-400' : 'bg-yellow-400'
-                }`} />
+              <div className={`bg-black/70 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2 text-white text-sm ${connectionQuality === 'poor' ? 'bg-red-500/70' : 'bg-yellow-500/70'
+                }`}>
+                <div className={`w-2 h-2 rounded-full ${connectionQuality === 'poor' ? 'bg-red-400' : 'bg-yellow-400'
+                  }`} />
                 <span>{connectionQuality === 'poor' ? 'Poor' : 'Unstable'} Connection</span>
               </div>
             )}

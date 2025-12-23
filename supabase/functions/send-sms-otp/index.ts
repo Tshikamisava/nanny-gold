@@ -18,32 +18,31 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { phoneNumber, firstName }: SmsOtpRequest = await req.json();
+    const { phoneNumber }: SmsOtpRequest = await req.json();
 
     // Strict South African phone number validation
     if (!phoneNumber) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Phone number is required' 
+        JSON.stringify({
+          success: false,
+          error: 'Phone number is required'
         }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
     // Clean phone number (remove non-digits)
     let cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     // Handle different input formats
     if (cleanPhone.startsWith('0')) {
       // Convert 0xxxxxxxxx to 27xxxxxxxxx
       cleanPhone = '27' + cleanPhone.substring(1);
     } else if (cleanPhone.startsWith('27')) {
       // Already has country code, keep as is
-      cleanPhone = cleanPhone;
     } else if (cleanPhone.length === 9) {
       // Assume it's a local number, add country code
       cleanPhone = '27' + cleanPhone;
@@ -52,13 +51,13 @@ const handler = async (req: Request): Promise<Response> => {
     // Must be exactly 11 digits total (27 + 9 local digits)
     if (cleanPhone.length !== 11 || !cleanPhone.startsWith('27')) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Invalid South African phone number format. Use +27xxxxxxxxx format (currently ${cleanPhone.length} digits)` 
+        JSON.stringify({
+          success: false,
+          error: `Invalid South African phone number format. Use +27xxxxxxxxx format (currently ${cleanPhone.length} digits)`
         }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -67,13 +66,13 @@ const handler = async (req: Request): Promise<Response> => {
     const localNumber = cleanPhone.substring(2);
     if (localNumber.length !== 9) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Invalid local number length. Must be exactly 9 digits after +27 (currently ${localNumber.length})` 
+        JSON.stringify({
+          success: false,
+          error: `Invalid local number length. Must be exactly 9 digits after +27 (currently ${localNumber.length})`
         }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -88,21 +87,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Get SMSPortal credentials - they should be configured
     const smsPortalClientId = Deno.env.get('SMSPORTAL_CLIENT_ID');
     const smsPortalApiSecret = Deno.env.get('SMSPORTAL_API_SECRET');
-    
+
     if (!smsPortalClientId || !smsPortalApiSecret) {
       console.error('SMSPortal credentials not configured');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'SMS service not configured' 
+        JSON.stringify({
+          success: false,
+          error: 'SMS service not configured'
         }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -120,13 +119,13 @@ const handler = async (req: Request): Promise<Response> => {
     if (otpError) {
       console.error('Error storing OTP:', otpError);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to generate OTP' 
+        JSON.stringify({
+          success: false,
+          error: 'Failed to generate OTP'
         }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -155,16 +154,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!smsResponse.ok) {
       console.error('SMSPortal API error:', smsResult);
-      
+
       // In production, return proper error instead of fallback
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to send SMS. Please try again or contact support.' 
+        JSON.stringify({
+          success: false,
+          error: 'Failed to send SMS. Please try again or contact support.'
         }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -172,26 +171,26 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('SMS sent successfully:', smsResult);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'OTP sent successfully' 
+      JSON.stringify({
+        success: true,
+        message: 'OTP sent successfully'
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
 
   } catch (error) {
     console.error('Error in send-sms-otp function:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: 'Internal server error' 
+      JSON.stringify({
+        success: false,
+        error: 'Internal server error'
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

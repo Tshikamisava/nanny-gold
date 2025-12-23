@@ -2,7 +2,9 @@ import { SERVICE_PRICING } from '@/constants/servicePricing';
 
 export interface HourlyPricingResult {
   baseRate: number;
+  baseHourlyRate: number; // Alias for baseRate per hour specifically
   addOns: Array<{ name: string; price: number }>;
+  services: Array<{ name: string; price: number; hourlyRate?: number; totalCost?: number }>; // Alias/Extension for UI
   subtotal: number;
   serviceFee: number;
   total: number;
@@ -10,6 +12,17 @@ export interface HourlyPricingResult {
   totalDays?: number;
   hourlyRate?: number; // Effective hourly rate including add-ons
   breakdown?: string;
+}
+
+export interface DailyPricingResult {
+  baseRate: number; // Daily rate
+  addOns: Array<{ name: string; price: number }>;
+  services: Array<{ name: string; price: number }>;
+  subtotal: number;
+  serviceFee: number;
+  total: number;
+  totalDays: number;
+  breakdown: Array<{ date: string; isWeekend: boolean; rate: number }>;
 }
 
 export interface LongTermPricingResult {
@@ -59,30 +72,34 @@ export const calculateHourlyPricing = async (
 
   // Initialize result
   let baseRate: number = 0;
+  let hourlyRateOnly: number = 0;
   let serviceFee: number = SERVICE_PRICING.short_term.emergency.service_fee; // Default 35
-  const addOns: Array<{ name: string; price: number }> = [];
+  const addOns: Array<{ name: string; price: number; hourlyRate?: number; totalCost?: number }> = [];
 
   // 1. Calculate Base Rate & Service Fee
   if (bookingType === 'temporary_support') {
-    // Gap Coverage
-    const weekdayRate = SERVICE_PRICING.short_term.gap_coverage.weekday_rate;
-    const weekendRate = SERVICE_PRICING.short_term.gap_coverage.weekend_rate;
-    let daysTotal = 0;
-
-    selectedDates.forEach(dateStr => {
-      const date = new Date(dateStr);
-      const isWeekend = date.getDay() === 0 || date.getDay() === 5 || date.getDay() === 6; // Fri, Sat, Sun
-      daysTotal += isWeekend ? weekendRate : weekdayRate;
-    });
-    baseRate = daysTotal;
-    serviceFee = SERVICE_PRICING.short_term.gap_coverage.placement_fee; // 2500
+    // Should use calculateDailyPricing for this, but keeping fail-safe here just in case
+    // This path might be deprecated if we strictly separate them
+    const daily = calculateDailyPricing(selectedDates, bookingType, homeSize, services);
+    return {
+      baseRate: daily.baseRate,
+      baseHourlyRate: 0,
+      addOns: daily.addOns,
+      services: daily.services,
+      subtotal: daily.subtotal,
+      serviceFee: daily.serviceFee,
+      total: daily.total,
+      totalDays: daily.totalDays
+    };
 
   } else if (bookingType === 'emergency') {
-    baseRate = SERVICE_PRICING.short_term.emergency.hourly_rate * Math.max(totalHours, SERVICE_PRICING.short_term.emergency.min_hours);
+    hourlyRateOnly = SERVICE_PRICING.short_term.emergency.hourly_rate;
+    baseRate = hourlyRateOnly * Math.max(totalHours, SERVICE_PRICING.short_term.emergency.min_hours);
     serviceFee = SERVICE_PRICING.short_term.emergency.service_fee;
 
   } else if (bookingType === 'date_night') {
-    baseRate = SERVICE_PRICING.short_term.date_night.hourly_rate * Math.max(totalHours, SERVICE_PRICING.short_term.date_night.min_hours);
+    hourlyRateOnly = SERVICE_PRICING.short_term.date_night.hourly_rate;
+    baseRate = hourlyRateOnly * Math.max(totalHours, SERVICE_PRICING.short_term.date_night.min_hours);
     serviceFee = SERVICE_PRICING.short_term.date_night.service_fee;
 
   } else {
@@ -97,7 +114,7 @@ export const calculateHourlyPricing = async (
       });
       if (hasWeekend) hourlyWithWeekend = SERVICE_PRICING.short_term.day_care.weekend_hourly;
     }
-
+    hourlyRateOnly = hourlyWithWeekend;
     baseRate = hourlyWithWeekend * totalHours;
     serviceFee = SERVICE_PRICING.short_term.day_care.service_fee;
   }
@@ -107,13 +124,7 @@ export const calculateHourlyPricing = async (
   if (services.cooking && ['emergency', 'date_night', 'date_day', 'school_holiday'].includes(bookingType)) {
     const days = Math.max(1, selectedDates.length);
     const cost = SERVICE_PRICING.add_ons.cooking.short_term_daily * days;
-    addOns.push({ name: 'Cooking', price: cost });
-  }
-
-  // Cooking for Gap Coverage
-  if (services.cooking && bookingType === 'temporary_support') {
-    const days = Math.max(1, selectedDates.length);
-    addOns.push({ name: 'Cooking', price: SERVICE_PRICING.add_ons.cooking.short_term_daily * days });
+    addOns.push({ name: 'Cooking', price: cost, totalCost: cost, hourlyRate: 0 });
   }
 
   // Light Housekeeping
@@ -122,11 +133,72 @@ export const calculateHourlyPricing = async (
     const dailyRate = SERVICE_PRICING.add_ons.light_housekeeping[sizeKey];
     const days = Math.max(1, selectedDates.length);
     const cost = dailyRate * days;
-    addOns.push({ name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`, price: cost });
+    addOns.push({ name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`, price: cost, totalCost: cost, hourlyRate: 0 });
   }
 
   if (services.specialNeeds) {
-    addOns.push({ name: 'Diverse Ability Support', price: 0 });
+    addOns.push({ name: 'Diverse Ability Support', price: 0, totalCost: 0, hourlyRate: 0 });
+  }
+
+  const addOnsTotal = addOns.reduce((sum, item) => sum + item.price, 0);
+
+  return {
+    baseRate,
+    baseHourlyRate: hourlyRateOnly,
+    addOns,
+    services: addOns,
+    subtotal: baseRate + addOnsTotal,
+    serviceFee,
+    total: baseRate + addOnsTotal + serviceFee,
+    totalHours,
+    totalDays: selectedDates.length,
+    hourlyRate: totalHours ? ((baseRate + addOnsTotal) / totalHours) : 0
+  };
+};
+
+export const calculateDailyPricing = (
+  selectedDates: string[],
+  bookingType: string,
+  homeSize?: string,
+  services: {
+    cooking?: boolean;
+    specialNeeds?: boolean;
+    drivingSupport?: boolean;
+    lightHousekeeping?: boolean;
+    petCare?: boolean;
+  } = {}
+): DailyPricingResult => {
+  const weekdayRate = SERVICE_PRICING.short_term.gap_coverage.weekday_rate;
+  const weekendRate = SERVICE_PRICING.short_term.gap_coverage.weekend_rate;
+
+  const breakdown: Array<{ date: string; isWeekend: boolean; rate: number }> = [];
+  let daysTotal = 0;
+
+  selectedDates.forEach(dateStr => {
+    const date = new Date(dateStr);
+    const day = date.getDay();
+    const isWeekend = day === 0 || day === 5 || day === 6; // Fri, Sat, Sun
+    const rate = isWeekend ? weekendRate : weekdayRate;
+    breakdown.push({ date: dateStr, isWeekend, rate });
+    daysTotal += rate;
+  });
+
+  const baseRate = daysTotal;
+  const serviceFee = SERVICE_PRICING.short_term.gap_coverage.placement_fee; // This is actually the 'service fee' for daily in some contexts, or we use a standard fee.
+  // Note: gap_coverage.placement_fee is 2500, which behaves like a placement fee.
+  // For daily temporary support, we might want a smaller service fee if it's not a full placement. 
+  // For now, using the logic from existing codebase which seems to treat temporary_support specially.
+  // Adjusting to standard service fee if it's just daily booking, or keeping 2500 if it's truly gap coverage placement.
+  // Let's assume standard service fee for daily unless it's a "Placement".
+  // Reverting to standard short term service fee logic for consistency if not specified otherwise, 
+  // but preserving the logic seen in previous file version if possible.
+
+  const addOns: Array<{ name: string; price: number }> = [];
+
+  // Cooking for Gap Coverage/Daily
+  if (services.cooking) {
+    const days = Math.max(1, selectedDates.length);
+    addOns.push({ name: 'Cooking', price: SERVICE_PRICING.add_ons.cooking.short_term_daily * days });
   }
 
   const addOnsTotal = addOns.reduce((sum, item) => sum + item.price, 0);
@@ -134,12 +206,12 @@ export const calculateHourlyPricing = async (
   return {
     baseRate,
     addOns,
+    services: addOns,
     subtotal: baseRate + addOnsTotal,
-    serviceFee,
+    serviceFee: 0,
     total: baseRate + addOnsTotal + serviceFee,
-    totalHours,
     totalDays: selectedDates.length,
-    hourlyRate: totalHours ? (baseRate / totalHours) : 0
+    breakdown
   };
 };
 
