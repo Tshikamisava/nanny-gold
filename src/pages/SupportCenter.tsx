@@ -25,7 +25,7 @@ const SupportCenter = () => {
   const [newMessage, setNewMessage] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
 
-  
+
 
   const handleEmergencyCall = () => {
     // Open emergency hotline dialog instead of direct call
@@ -44,7 +44,7 @@ const SupportCenter = () => {
 
   const handleSendMessage = async () => {
     if (!selectedTicket || !newMessage.trim()) return;
-    
+
     try {
       await sendMessage(selectedTicket.id, newMessage);
       setNewMessage('');
@@ -77,14 +77,14 @@ const SupportCenter = () => {
 
   // Group tickets by status
   const { pendingTickets, resolvedTickets } = useMemo(() => {
-    const pending = tickets.filter(ticket => 
+    const pending = tickets.filter(ticket =>
       ticket.status === 'open' || ticket.status === 'in_progress'
     ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
-    const resolved = tickets.filter(ticket => 
+
+    const resolved = tickets.filter(ticket =>
       ticket.status === 'resolved' || ticket.status === 'closed'
     ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
+
     return { pendingTickets: pending, resolvedTickets: resolved };
   }, [tickets]);
 
@@ -113,11 +113,11 @@ const SupportCenter = () => {
             <p className="text-muted-foreground">Get help and support</p>
           </div>
         </div>
-        
+
         <div className="text-center mb-8">
-          <img 
-            src="/lovable-uploads/e08f85db-a755-4e37-9622-463b1ecb94c9.png" 
-            alt="Support" 
+          <img
+            src="/lovable-uploads/e08f85db-a755-4e37-9622-463b1ecb94c9.png"
+            alt="Support"
             className="w-20 h-20 mx-auto mb-4"
           />
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -169,9 +169,9 @@ const SupportCenter = () => {
                       Coming Soon
                     </Button>
                   </div>
-                  
+
                   <div className="border-t pt-4">
-                    <SupportTicketDialog 
+                    <SupportTicketDialog
                       trigger={
                         <Button className="w-full" variant="outline">
                           <Plus className="w-4 h-4 mr-2" />
@@ -240,9 +240,8 @@ const SupportCenter = () => {
                                 {pendingTickets.map((ticket) => (
                                   <div
                                     key={ticket.id}
-                                    className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
-                                      selectedTicket?.id === ticket.id ? 'border-primary bg-muted/30' : ''
-                                    }`}
+                                    className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${selectedTicket?.id === ticket.id ? 'border-primary bg-muted/30' : ''
+                                      }`}
                                     onClick={() => handleTicketClick(ticket)}
                                   >
                                     <div className="flex items-start justify-between mb-2">
@@ -282,9 +281,8 @@ const SupportCenter = () => {
                                 {resolvedTickets.map((ticket) => (
                                   <div
                                     key={ticket.id}
-                                    className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 opacity-75 ${
-                                      selectedTicket?.id === ticket.id ? 'border-primary bg-muted/30' : ''
-                                    }`}
+                                    className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 opacity-75 ${selectedTicket?.id === ticket.id ? 'border-primary bg-muted/30' : ''
+                                      }`}
                                     onClick={() => handleTicketClick(ticket)}
                                   >
                                     <div className="flex items-start justify-between mb-2">
@@ -322,7 +320,7 @@ const SupportCenter = () => {
                         {selectedTicket ? `Chat - ${selectedTicket.subject}` : 'Select a ticket'}
                       </h3>
                     </div>
-                    
+
                     {selectedTicket ? (
                       <>
                         <ScrollArea className="flex-1 p-3 md:p-4">
@@ -349,7 +347,7 @@ const SupportCenter = () => {
                             )}
                           </div>
                         </ScrollArea>
-                        
+
                         <div className="p-3 md:p-4 border-t space-y-2">
                           <Textarea
                             placeholder="Type your message..."
@@ -357,8 +355,8 @@ const SupportCenter = () => {
                             onChange={(e) => setNewMessage(e.target.value)}
                             rows={2}
                           />
-                          <Button 
-                            onClick={handleSendMessage} 
+                          <Button
+                            onClick={handleSendMessage}
                             disabled={!newMessage.trim()}
                             className="w-full"
                             size="sm"
@@ -383,12 +381,12 @@ const SupportCenter = () => {
         </div>
 
         {/* DISABLED: AI Chat Widget - disabled until post-launch */}
-        {false && chatOpen && (
+        {/* {chatOpen && (
           <SmartChatWidget 
             userType={user?.user_metadata?.user_type || 'client'} 
             forceOpen={chatOpen}
           />
-        )}
+        )} */ }
       </div>
     </div>
   );

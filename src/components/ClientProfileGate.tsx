@@ -20,7 +20,7 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
   useEffect(() => {
     const run = async () => {
       if (!user) return;
-      
+
       // Skip redirect if explicitly disabled (for post-payment flows)
       if (skipRedirect) {
         console.log('🔓 ClientProfileGate: Skipping redirect check (skipRedirect=true)');
@@ -41,7 +41,7 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
       }
 
       // Skip redirect if coming from payment flow (check navigation state)
-      const navigationState = (location.state as any);
+      const navigationState = location.state as Record<string, unknown> | null;
       if (navigationState?.paymentMethod || navigationState?.paymentStatus || navigationState?.bookingId) {
         console.log('🔓 ClientProfileGate: Skipping redirect check (payment flow detected)');
         return;
@@ -53,34 +53,35 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
         console.log('🔓 ClientProfileGate: Skipping redirect check (payment query params detected)');
         return;
       }
-      
+
       try {
         // Check if user is admin - if so, skip client profile requirements
         const userRole = await getUserRole(user.id);
         if (userRole === 'admin') {
           return;
         }
-        
+
         // Only check client profile for actual clients
         if (userRole === 'client') {
           // Check if user is starting a new booking (before loading profile)
           const isStartingNewBooking = ['/service-prompt', '/short-term-booking', '/living-arrangement', '/schedule-builder', '/nanny-preferences'].some(route => location.pathname.includes(route));
-          
+
           let profile;
           try {
             profile = await loadClientProfile(user.id);
-            
+
             // If profile is null but we're in a payment flow, don't redirect
             // The loadClientProfile function will use cached data on network errors
             if (!profile && (!isStartingNewBooking || location.pathname.includes('/payment'))) {
               console.warn('⚠️ ClientProfileGate: Profile is null, but allowing access for payment flow');
               return;
             }
-          } catch (profileError: any) {
+          } catch (profileError: unknown) {
+            const error = profileError as Error & { code?: string };
             // If profile load fails due to network error, try to get cached data
-            if (profileError?.message?.includes('fetch') || profileError?.message?.includes('network') || profileError?.code === 'ERR_NETWORK') {
+            if (error?.message?.includes('fetch') || error?.message?.includes('network') || error?.code === 'ERR_NETWORK') {
               console.warn('⚠️ ClientProfileGate: Network error loading profile, checking cache');
-              
+
               // Try to get cached profile
               try {
                 const cached = localStorage.getItem(`client-profile-${user.id}`);
@@ -97,7 +98,7 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
               } catch (cacheError) {
                 console.warn('⚠️ ClientProfileGate: Error reading cache:', cacheError);
               }
-              
+
               // If we have cached profile, continue with check
               // If not, allow access to prevent blocking user flow
               if (!profile) {
@@ -108,11 +109,11 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
               throw profileError; // Re-throw other errors
             }
           }
-          
+
           // More lenient check - only require location, childrenAges is optional
           const hasLocation = !!profile?.location && profile.location.trim() !== '';
-          const hasChildren = (profile?.childrenAges?.filter(a => a && a.trim()).length || 0) > 0;
-          
+          // Removed unused hasChildren variable
+
           // Only redirect if profile is truly incomplete AND user is starting a new booking
           // Don't redirect if they're completing an existing booking or payment
           if (isStartingNewBooking && !hasLocation) {
@@ -127,11 +128,12 @@ export const ClientProfileGate = ({ children, skipRedirect = false }: ClientProf
             console.log('✅ ClientProfileGate: Profile check passed or not required for this route');
           }
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Error in ClientProfileGate:', e);
+        const error = e as Error & { code?: string };
         // Don't redirect on errors - let the user continue
         // Network errors shouldn't block the user from completing their booking
-        if (e?.message?.includes('fetch') || e?.message?.includes('network') || e?.code === 'ERR_NETWORK') {
+        if (error?.message?.includes('fetch') || error?.message?.includes('network') || error?.code === 'ERR_NETWORK') {
           console.warn('⚠️ ClientProfileGate: Network error detected, allowing access to prevent blocking user flow');
         } else {
           console.warn('⚠️ ClientProfileGate: Error checking profile, allowing access to prevent blocking user flow');

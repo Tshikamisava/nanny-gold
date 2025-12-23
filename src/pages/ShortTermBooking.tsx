@@ -142,16 +142,16 @@ const ShortTermBooking = () => {
           console.log('⏰ Total hours calculated:', totalHours);
           // Map services using short-term handler pattern
           const lightHousekeeping = preferences.householdSupport?.includes('light-housekeeping') || false;
-          
+
           const pricing = await calculateHourlyPricing(
-            bookingType as 'emergency' | 'date_night' | 'date_day', 
-            totalHours, 
+            bookingType as 'emergency' | 'date_night' | 'date_day',
+            totalHours,
             {
               cooking: preferences.cooking,
               specialNeeds: preferences.specialNeeds,
               drivingSupport: preferences.drivingSupport,
               lightHousekeeping // Add light housekeeping flag
-            }, 
+            },
             selectedDates.map(date => date.toISOString().split('T')[0]),
             // Only pass homeSize if light housekeeping is selected
             lightHousekeeping ? preferences.homeSize : undefined
@@ -159,7 +159,7 @@ const ShortTermBooking = () => {
           console.log('💰 Hourly pricing result:', pricing);
           setHourlyPricing(pricing);
           setDailyPricing(null);
-          
+
           // Log day-of-week info for date_day bookings
           if (bookingType === 'date_day' && selectedDates.length === 1) {
             const date = selectedDates[0];
@@ -174,20 +174,20 @@ const ShortTermBooking = () => {
           console.log('📊 Calculating daily pricing...', {
             selectedDates: selectedDates.length
           });
-      // Extract light housekeeping from householdSupport array
-      const lightHousekeeping = preferences.householdSupport?.includes('light-housekeeping') || false;
-      
-      const pricing = calculateDailyPricing(
-        selectedDates.map(date => date.toISOString().split('T')[0]), 
-        bookingType,
-        preferences.homeSize, // Add home size for light housekeeping calculation
-        {
-          cooking: preferences.cooking || false,
-          lightHousekeeping,
-          specialNeeds: preferences.specialNeeds || false,
-          drivingSupport: preferences.drivingSupport || false
-        }
-      );
+          // Extract light housekeeping from householdSupport array
+          const lightHousekeeping = preferences.householdSupport?.includes('light-housekeeping') || false;
+
+          const pricing = calculateDailyPricing(
+            selectedDates.map(date => date.toISOString().split('T')[0]),
+            bookingType,
+            preferences.homeSize, // Add home size for light housekeeping calculation
+            {
+              cooking: preferences.cooking || false,
+              lightHousekeeping,
+              specialNeeds: preferences.specialNeeds || false,
+              drivingSupport: preferences.drivingSupport || false
+            }
+          );
           console.log('💰 Daily pricing result:', pricing);
           setDailyPricing(pricing);
           setHourlyPricing(null);
@@ -412,152 +412,152 @@ const ShortTermBooking = () => {
     return date < new Date();
   };
   return <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex flex-col items-center justify-center min-h-screen px-4">
-        {/* NannyGold Branding */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold leading-tight mb-2">
-            <span className="text-primary">Nanny</span>
-            <span className="gold-shimmer">Gold</span>
-          </h1>
-          <p className="text-muted-foreground text-lg">Short-Term Support Options</p>
-        </div>
+    <div className="flex flex-col items-center justify-center min-h-screen px-4">
+      {/* NannyGold Branding */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold leading-tight mb-2">
+          <span className="text-primary">Nanny</span>
+          <span className="gold-shimmer">Gold</span>
+        </h1>
+        <p className="text-muted-foreground text-lg">Short-Term Support Options</p>
+      </div>
 
-        <div className="w-full max-w-sm space-y-6">
-          {!bookingType && <>
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-foreground mb-2">What type of support do you need?</h2>
-                <p className="text-muted-foreground">
-                  Choose the option that best fits your needs
+      <div className="w-full max-w-sm space-y-6">
+        {!bookingType && <>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-foreground mb-2">What type of support do you need?</h2>
+            <p className="text-muted-foreground">
+              Choose the option that best fits your needs
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {/* Emergency Booking - Top Priority */}
+            <Card className="p-6 rounded-2xl border-red-300 bg-red-50 cursor-pointer hover:shadow-lg transition-all hover:border-red-400" onClick={() => handleBookingTypeSelect('emergency')}>
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center border-2 border-red-300">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-red-800 mb-2">
+                  Emergency Support
+                </h3>
+                <p className="text-red-700 font-medium">Need help TODAY? Nanny arrives within 2 hours</p>
+              </div>
+            </Card>
+
+            <Card className="p-6 rounded-2xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('date_night')}>
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
+                  <Clock className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  Date Night
+                </h3>
+                <p className="text-muted-foreground">Evening support for special occasions</p>
+              </div>
+            </Card>
+
+            <Card className="p-6 rounded-2xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('date_day')}>
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
+                  <Users className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Daytime</h3>
+                <p className="text-muted-foreground">Daytime help any day, any reason</p>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('temporary_support')}>
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-3 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
+                  <Shield className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Gap Coverage</h3>
+                <p className="text-muted-foreground text-sm">Support during transitions, up to 1 month</p>
+              </div>
+            </Card>
+
+            {/* Live Pricing Display */}
+            {(hourlyPricing || dailyPricing) && <Card className="p-4 rounded-xl border-primary/20 bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  💰 Live Pricing
+                  {isCalculatingPrice && <span className="text-sm text-muted-foreground">(calculating...)</span>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {hourlyPricing && <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span>Base Rate:</span>
+                    <span>{formatCurrency(hourlyPricing.baseRate)}</span>
+                  </div>
+                  {hourlyPricing.services.length > 0 && <div className="flex justify-between">
+                    <span>Additional Services:</span>
+                    <span>{formatCurrency(hourlyPricing.servicesTotal)}</span>
+                  </div>}
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(hourlyPricing.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Service Fee (15%):</span>
+                    <span>{formatCurrency(hourlyPricing.serviceFee)}</span>
+                  </div>
+                  {hourlyPricing.emergencySurcharge > 0 && <div className="flex justify-between text-red-600">
+                    <span>Emergency Surcharge:</span>
+                    <span>{formatCurrency(hourlyPricing.emergencySurcharge)}</span>
+                  </div>}
+                  <div className="border-t pt-2 flex justify-between font-bold">
+                    <span>Total:</span>
+                    <span>{formatCurrency(hourlyPricing.total)}</span>
+                  </div>
+                </div>}
+                {dailyPricing && <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span>Daily Rate:</span>
+                    <span>{formatCurrency(dailyPricing.dailyRate)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Number of Days:</span>
+                    <span>{dailyPricing.numberOfDays}</span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-bold">
+                    <span>Total:</span>
+                    <span>{formatCurrency(dailyPricing.total)}</span>
+                  </div>
+                </div>}
+              </CardContent>
+            </Card>}
+
+            {/* Bespoke Arrangements Section */}
+            <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-muted">
+              <div className="text-center mb-3">
+                <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-base font-semibold text-foreground mb-1">Need Something Different?</h3>
+                <p className="text-muted-foreground text-xs">
+                  Can't find the right support option? We offer bespoke arrangements tailored to your unique needs.
                 </p>
               </div>
 
-              <div className="space-y-4">
-                {/* Emergency Booking - Top Priority */}
-                <Card className="p-6 rounded-2xl border-red-300 bg-red-50 cursor-pointer hover:shadow-lg transition-all hover:border-red-400" onClick={() => handleBookingTypeSelect('emergency')}>
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center border-2 border-red-300">
-                      <AlertTriangle className="w-8 h-8 text-red-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-red-800 mb-2">
-                      Emergency Support
-                    </h3>
-                    <p className="text-red-700 font-medium">Need help TODAY? Nanny arrives within 2 hours</p>
-                  </div>
-                </Card>
+              <Button variant="outline" onClick={() => openBespokeEmail({ bookingType: 'short_term' })} className="w-full border-primary/30 text-primary hover:bg-primary/5 rounded-xl py-2 text-sm">
+                Email Us for Custom Arrangements
+              </Button>
+            </div>
+          </div>
+        </>}
 
-                <Card className="p-6 rounded-2xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('date_night')}>
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
-                      <Clock className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">
-                      Date Night
-                    </h3>
-                    <p className="text-muted-foreground">Evening support for special occasions</p>
-                  </div>
-                </Card>
-
-                <Card className="p-6 rounded-2xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('date_day')}>
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
-                      <Users className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">Daytime</h3>
-                    <p className="text-muted-foreground">Daytime help any day, any reason</p>
-                  </div>
-                </Card>
-
-                <Card className="p-4 rounded-xl border-primary/20 cursor-pointer hover:shadow-lg transition-all hover:border-primary/40" onClick={() => handleBookingTypeSelect('temporary_support')}>
-                  <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
-                      <Shield className="w-6 h-6 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Gap Coverage</h3>
-                    <p className="text-muted-foreground text-sm">Support during transitions, up to 1 month</p>
-                  </div>
-                </Card>
-
-                {/* Live Pricing Display */}
-                {(hourlyPricing || dailyPricing) && <Card className="p-4 rounded-xl border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        💰 Live Pricing
-                        {isCalculatingPrice && <span className="text-sm text-muted-foreground">(calculating...)</span>}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {hourlyPricing && <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span>Base Rate:</span>
-                            <span>{formatCurrency(hourlyPricing.baseRate)}</span>
-                          </div>
-                          {hourlyPricing.services.length > 0 && <div className="flex justify-between">
-                              <span>Additional Services:</span>
-                              <span>{formatCurrency(hourlyPricing.servicesTotal)}</span>
-                            </div>}
-                          <div className="flex justify-between">
-                            <span>Subtotal:</span>
-                            <span>{formatCurrency(hourlyPricing.subtotal)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Service Fee (15%):</span>
-                            <span>{formatCurrency(hourlyPricing.serviceFee)}</span>
-                          </div>
-                          {hourlyPricing.emergencySurcharge > 0 && <div className="flex justify-between text-red-600">
-                              <span>Emergency Surcharge:</span>
-                              <span>{formatCurrency(hourlyPricing.emergencySurcharge)}</span>
-                            </div>}
-                          <div className="border-t pt-2 flex justify-between font-bold">
-                            <span>Total:</span>
-                            <span>{formatCurrency(hourlyPricing.total)}</span>
-                          </div>
-                        </div>}
-                      {dailyPricing && <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span>Daily Rate:</span>
-                            <span>{formatCurrency(dailyPricing.dailyRate)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Number of Days:</span>
-                            <span>{dailyPricing.numberOfDays}</span>
-                          </div>
-                          <div className="border-t pt-2 flex justify-between font-bold">
-                            <span>Total:</span>
-                            <span>{formatCurrency(dailyPricing.total)}</span>
-                          </div>
-                        </div>}
-                    </CardContent>
-                  </Card>}
-
-                {/* Bespoke Arrangements Section */}
-                <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-muted">
-                  <div className="text-center mb-3">
-                    <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-primary" />
-                    </div>
-                    <h3 className="text-base font-semibold text-foreground mb-1">Need Something Different?</h3>
-                    <p className="text-muted-foreground text-xs">
-                      Can't find the right support option? We offer bespoke arrangements tailored to your unique needs.
-                    </p>
-                  </div>
-                  
-                  <Button variant="outline" onClick={() => openBespokeEmail({ bookingType: 'short_term' })} className="w-full border-primary/30 text-primary hover:bg-primary/5 rounded-xl py-2 text-sm">
-                    Email Us for Custom Arrangements
-                  </Button>
-                </div>
-              </div>
-            </>}
-
-          {/* Date Selection - Only for non-emergency bookings */}
-          {bookingType && bookingType !== 'emergency' && <div className="space-y-6">
-              <Card className="rounded-2xl border-primary/20">
-                <CardHeader className="bg-primary/5 rounded-t-2xl border-b border-primary/10">
-                  <CardTitle className="text-primary text-center">
-                    Select Your {bookingType === 'date_night' ? 'Date Night' : bookingType === 'date_day' ? 'Day Care' : bookingType === 'temporary_support' ? 'Gap Coverage' : 'Temporary Support'} Dates
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <Calendar mode="multiple" selected={selectedDates} onSelect={handleDateSelect} disabled={isDateDisabled} className="w-full" classNames={{
+        {/* Date Selection - Only for non-emergency bookings */}
+        {bookingType && bookingType !== 'emergency' && <div className="space-y-6">
+          <Card className="rounded-2xl border-primary/20">
+            <CardHeader className="bg-primary/5 rounded-t-2xl border-b border-primary/10">
+              <CardTitle className="text-primary text-center">
+                Select Your {bookingType === 'date_night' ? 'Date Night' : bookingType === 'date_day' ? 'Day Care' : bookingType === 'temporary_support' ? 'Gap Coverage' : 'Temporary Support'} Dates
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <Calendar mode="multiple" selected={selectedDates} onSelect={handleDateSelect} disabled={isDateDisabled} className="w-full" classNames={{
                 months: "flex flex-col space-y-4",
                 month: "space-y-4",
                 caption: "flex justify-center pt-1 relative items-center mb-4",
@@ -577,54 +577,54 @@ const ShortTermBooking = () => {
                 day_outside: "text-muted-foreground opacity-50",
                 day_disabled: "text-muted-foreground opacity-50"
               }} />
-                  {selectedDates.length > 0 && bookingType === 'temporary_support' && <div className="mt-3 p-2 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-                      <div className="text-center">
-                        <div className="flex items-center justify-center space-x-2 mb-1">
-                          <span className="text-xs font-medium text-primary/80">Total</span>
-                          {selectedDates.length < 6 && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200">
-                              Min 6
-                            </span>}
-                        </div>
-                        <div className="text-xl font-bold text-primary animate-fade-in transition-all duration-300">
-                          R{(selectedDates.length * 250).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>}
-                </CardContent>
-              </Card>
+              {selectedDates.length > 0 && bookingType === 'temporary_support' && <div className="mt-3 p-2 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                <div className="text-center">
+                  <div className="flex items-center justify-center space-x-2 mb-1">
+                    <span className="text-xs font-medium text-primary/80">Total</span>
+                    {selectedDates.length < 6 && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200">
+                      Min 6
+                    </span>}
+                  </div>
+                  <div className="text-xl font-bold text-primary animate-fade-in transition-all duration-300">
+                    R{(selectedDates.length * 250).toLocaleString()}
+                  </div>
+                </div>
+              </div>}
+            </CardContent>
+          </Card>
 
-              {/* Time Slots for Date Night and Date Day */}
-              {(bookingType === 'date_night' || bookingType === 'date_day') && <Card className="rounded-2xl border-primary/20">
-                  <CardHeader className="bg-primary/5 rounded-t-2xl border-b border-primary/10">
-                    <CardTitle className="text-primary text-center">
-                      {bookingType === 'date_night' ? 'Select your time slots' : 'Select your daily schedule'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-4">
-                    {bookingType === 'date_night' && <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
-                        <div className="flex items-center text-blue-700">
-                          <Clock className="w-4 h-4 mr-2" />
-                          <p className="text-sm font-medium">
-                            Date Night support is available from 5:00 PM onwards
-                          </p>
-                        </div>
-                      </div>}
-                    
-                    {timeSlots.map((slot, index) => <div key={index} className="flex items-center space-x-2">
-                        <input type="time" value={slot.start} onChange={e => updateTimeSlot(index, 'start', e.target.value)} min={bookingType === 'date_night' ? '17:00' : undefined} className={`flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary/20 ${bookingType === 'date_night' ? 'border-primary/20 focus:border-primary' : 'border-primary/20 focus:border-primary'}`} />
-                        <span className="text-primary">to</span>
-                        <input type="time" value={slot.end} onChange={e => updateTimeSlot(index, 'end', e.target.value)} className="flex-1 p-2 border border-primary/20 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20" />
-                        {timeSlots.length > 1 && <Button variant="outline" size="sm" onClick={() => removeTimeSlot(index)} className="p-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300">
-                            <X className="w-4 h-4" />
-                          </Button>}
-                      </div>)}
-                     
-                     <Button variant="outline" onClick={addTimeSlot} className="w-full border-primary/30 text-primary hover:bg-primary/10">
-                       Add Time Slot
-                     </Button>
+          {/* Time Slots for Date Night and Date Day */}
+          {(bookingType === 'date_night' || bookingType === 'date_day') && <Card className="rounded-2xl border-primary/20">
+            <CardHeader className="bg-primary/5 rounded-t-2xl border-b border-primary/10">
+              <CardTitle className="text-primary text-center">
+                {bookingType === 'date_night' ? 'Select your time slots' : 'Select your daily schedule'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              {bookingType === 'date_night' && <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                <div className="flex items-center text-blue-700">
+                  <Clock className="w-4 h-4 mr-2" />
+                  <p className="text-sm font-medium">
+                    Date Night support is available from 5:00 PM onwards
+                  </p>
+                </div>
+              </div>}
 
-                     {/* Live Pricing Display - TEMPORARILY HIDDEN until post-launch fix */}
-                     {false && selectedDates.length > 0 && timeSlots.length > 0 && <div className="mt-3 p-3 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+              {timeSlots.map((slot, index) => <div key={index} className="flex items-center space-x-2">
+                <input type="time" value={slot.start} onChange={e => updateTimeSlot(index, 'start', e.target.value)} min={bookingType === 'date_night' ? '17:00' : undefined} className={`flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary/20 ${bookingType === 'date_night' ? 'border-primary/20 focus:border-primary' : 'border-primary/20 focus:border-primary'}`} />
+                <span className="text-primary">to</span>
+                <input type="time" value={slot.end} onChange={e => updateTimeSlot(index, 'end', e.target.value)} className="flex-1 p-2 border border-primary/20 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20" />
+                {timeSlots.length > 1 && <Button variant="outline" size="sm" onClick={() => removeTimeSlot(index)} className="p-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300">
+                  <X className="w-4 h-4" />
+                </Button>}
+              </div>)}
+
+              <Button variant="outline" onClick={addTimeSlot} className="w-full border-primary/30 text-primary hover:bg-primary/10">
+                Add Time Slot
+              </Button>
+
+              {/* Live Pricing Display - TEMPORARILY HIDDEN until post-launch fix */}
+              {/* {selectedDates.length > 0 && timeSlots.length > 0 && <div className="mt-3 p-3 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
                          <div className="text-center">
                            <div className="flex items-center justify-center space-x-2 mb-1">
                              <span className="text-xs font-medium text-primary/80">Live Rate</span>
@@ -638,101 +638,104 @@ const ShortTermBooking = () => {
                                  </div>
                                  <div className="text-xs text-primary/70 mt-1">
                                    {selectedDates.length} day{selectedDates.length > 1 ? 's' : ''} × {timeSlots.reduce((total, slot) => {
-                        const [startHour, startMin] = slot.start.split(':').map(Number);
-                        const [endHour, endMin] = slot.end.split(':').map(Number);
-                        const hours = endHour + endMin / 60 - (startHour + startMin / 60);
-                        return total + hours;
-                      }, 0).toFixed(1)} hrs/day
-                                 </div>
-                                 {hourlyPricing.emergencySurcharge > 0 && <div className="text-xs text-red-600 mt-1">
-                                     Includes emergency surcharge
-                                   </div>}
-                               </div> : <div className="text-lg font-semibold text-primary/60">
-                                 {selectedDates.length === 0 ? 'Select dates first, then time slots' : 'Add time slots to see pricing'}
-                               </div>}
-                         </div>
-                       </div>}
-                  </CardContent>
-                </Card>}
-
-                {/* Bespoke Arrangements Section */}
-                <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-muted">
-                  <div className="text-center mb-3">
-                    <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-primary" />
-                    </div>
-                    <h3 className="text-base font-semibold text-foreground mb-1">Need Something Different?</h3>
-                    <p className="text-muted-foreground text-xs">
-                      Can't find the right support option? We offer bespoke arrangements tailored to your unique needs.
-                    </p>
-                  </div>
-                  
-                  <Button variant="outline" onClick={() => openBespokeEmail({ bookingType })} className="w-full border-primary/30 text-primary hover:bg-primary/5 rounded-xl py-2 text-sm">
-                    Email Us for Custom Arrangements
-                  </Button>
-                </div>
-
-              <Button onClick={handleContinue} disabled={selectedDates.length === 0 || (bookingType === 'date_night' || bookingType === 'date_day') && timeSlots.length === 0} className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-2xl font-semibold disabled:opacity-50">
-                Continue
-              </Button>
-
-              <Button variant="outline" onClick={() => setBookingType(null)} className="w-full border-primary/20 text-primary hover:bg-primary/10 rounded-2xl">
-                Reset Selection
-              </Button>
+                                      const [startHour, startMin] = slot.start.split(':').map(Number);
+                                      const [endHour, endMin] = slot.end.split(':').map(Number);
+                                      const hours = endHour + endMin / 60 - (startHour + startMin / 60);
+                                      return total + hours;
+                                    }, 0).toFixed(1)} hrs/day
+            </div>
+            {hourlyPricing.emergencySurcharge > 0 && <div className="text-xs text-red-600 mt-1">
+              Includes emergency surcharge
             </div>}
+          </div> : <div className="text-lg font-semibold text-primary/60">
+            {selectedDates.length === 0 ? 'Select dates first, then time slots' : 'Add time slots to see pricing'}
+          </div>}
+        </div>
+                       </div>} */ }
+            </CardContent>
+          </Card>
+          }
 
-          {/* Emergency Booking Interface */}
-          {bookingType === 'emergency' && <div className="space-y-6">
-              <Card className="rounded-2xl border-red-300 bg-red-50">
-                <CardHeader className="bg-red-100 rounded-t-2xl border-b border-red-200">
-                  <CardTitle className="text-red-800 text-center">Emergency Request</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 text-center">
-                  <div className="mb-6">
-                    <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-600" />
-                    <h3 className="text-xl font-semibold text-red-800 mb-2">
-                      Need Help Today?
-                    </h3>
-                    <p className="text-red-700 mb-4">
-                      We'll connect you with available nannies who can arrive within 2 hours. Minimum 5-hour booking at R80/hour.
+          {/* Bespoke Arrangements Section */}
+          <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-muted">
+            <div className="text-center mb-3">
+              <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center">
+                <Shield className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">Need Something Different?</h3>
+              <p className="text-muted-foreground text-xs">
+                Can't find the right support option? We offer bespoke arrangements tailored to your unique needs.
+              </p>
+            </div>
+
+            <Button variant="outline" onClick={() => openBespokeEmail({ bookingType })} className="w-full border-primary/30 text-primary hover:bg-primary/5 rounded-xl py-2 text-sm">
+              Email Us for Custom Arrangements
+            </Button>
+          </div>
+
+          <Button onClick={handleContinue} disabled={selectedDates.length === 0 || (bookingType === 'date_night' || bookingType === 'date_day') && timeSlots.length === 0} className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-2xl font-semibold disabled:opacity-50">
+            Continue
+          </Button>
+
+          <Button variant="outline" onClick={() => setBookingType(null)} className="w-full border-primary/20 text-primary hover:bg-primary/10 rounded-2xl">
+            Reset Selection
+          </Button>
+        </div >}
+
+        {/* Emergency Booking Interface */}
+        {
+          bookingType === 'emergency' && <div className="space-y-6">
+            <Card className="rounded-2xl border-red-300 bg-red-50">
+              <CardHeader className="bg-red-100 rounded-t-2xl border-b border-red-200">
+                <CardTitle className="text-red-800 text-center">Emergency Request</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 text-center">
+                <div className="mb-6">
+                  <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-600" />
+                  <h3 className="text-xl font-semibold text-red-800 mb-2">
+                    Need Help Today?
+                  </h3>
+                  <p className="text-red-700 mb-4">
+                    We'll connect you with available nannies who can arrive within 2 hours. Minimum 5-hour booking at R80/hour.
+                  </p>
+
+                  <div className="bg-white p-4 rounded-lg border border-red-200">
+                    <p className="text-sm text-red-600 font-medium">
+                      Quick Response: Nannies notified immediately<br />
+                      Today Only: Service for immediate needs
+                      {calculatedTime && <>
+                        <br />Start Time: {calculatedTime.startTimeFormatted}
+                      </>}
                     </p>
-                    
-                    <div className="bg-white p-4 rounded-lg border border-red-200">
-                      <p className="text-sm text-red-600 font-medium">
-                        Quick Response: Nannies notified immediately<br />
-                        Today Only: Service for immediate needs
-                         {calculatedTime && <>
-                             <br />Start Time: {calculatedTime.startTimeFormatted}
-                           </>}
-                      </p>
-                      
-                      {/* Emergency Pricing Display */}
-                      <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
-                        <div className="text-center">
-                          <div className="text-xs font-medium text-red-700 mb-1">Emergency Rate</div>
-                          <div className="text-lg font-bold text-red-700">
-                            R80/hour (min 5 hours = R400)
-                          </div>
-                          <div className="text-xs text-red-600 mt-1">
-                            + Emergency surcharge applies
-                          </div>
+
+                    {/* Emergency Pricing Display */}
+                    <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
+                      <div className="text-center">
+                        <div className="text-xs font-medium text-red-700 mb-1">Emergency Rate</div>
+                        <div className="text-lg font-bold text-red-700">
+                          R80/hour (min 5 hours = R400)
+                        </div>
+                        <div className="text-xs text-red-600 mt-1">
+                          + Emergency surcharge applies
                         </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Button onClick={handleContinue} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-semibold text-lg">
-                Submit Emergency Request
-              </Button>
+            <Button onClick={handleContinue} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-semibold text-lg">
+              Submit Emergency Request
+            </Button>
 
-              <Button variant="outline" onClick={() => setBookingType(null)} className="w-full border-red-300 text-red-600 hover:bg-red-50 rounded-2xl">
-                Reset Selection
-              </Button>
-            </div>}
-        </div>
-      </div>
-    </div>;
+            <Button variant="outline" onClick={() => setBookingType(null)} className="w-full border-red-300 text-red-600 hover:bg-red-50 rounded-2xl">
+              Reset Selection
+            </Button>
+          </div>
+        }
+      </div >
+    </div >
+  </div >;
 };
 export default ShortTermBooking;

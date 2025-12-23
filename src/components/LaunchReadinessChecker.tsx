@@ -75,51 +75,57 @@ export const LaunchReadinessChecker = () => {
   const performCheck = async (check: Omit<SecurityCheck, 'status' | 'message'>): Promise<SecurityCheck> => {
     try {
       switch (check.id) {
-        case 'pwa_manifest':
+        case 'pwa_manifest': {
           const manifestResponse = await fetch('/manifest.json');
           return {
             ...check,
             status: manifestResponse.ok ? 'pass' : 'fail',
             message: manifestResponse.ok ? 'PWA manifest found and accessible' : 'PWA manifest not found'
           };
+        }
 
-        case 'service_worker':
+        case 'service_worker': {
           const swSupported = 'serviceWorker' in navigator;
           return {
             ...check,
             status: swSupported ? 'pass' : 'warning',
             message: swSupported ? 'Service Worker supported and registered' : 'Service Worker not supported'
           };
+        }
 
-        case 'ssl_https':
+        case 'ssl_https': {
           const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
           return {
             ...check,
             status: isSecure ? 'pass' : 'fail',
             message: isSecure ? 'Secure HTTPS connection' : 'HTTPS connection required for production'
           };
+        }
 
-        case 'auth_flow':
+        case 'auth_flow': {
           const { data: { session } } = await supabase.auth.getSession();
           return {
             ...check,
             status: 'pass',
             message: 'Authentication system is functional'
           };
+        }
 
-        case 'password_strength':
+        case 'password_strength': {
           return {
             ...check,
             status: 'pass',
             message: 'Password strength validation implemented'
           };
+        }
 
-        case 'otp_security':
+        case 'otp_security': {
           return {
             ...check,
             status: 'pass',
             message: 'Smart OTP expiry: Email (10min), SMS (2min) with rate limiting'
           };
+        }
 
         default:
           return {
@@ -155,14 +161,14 @@ export const LaunchReadinessChecker = () => {
   };
 
   const getStatusBadge = (status: SecurityCheck['status'], critical: boolean) => {
-    const variant = status === 'pass' ? 'default' : 
-                    status === 'fail' && critical ? 'destructive' : 
-                    status === 'warning' ? 'secondary' : 'outline';
-    
-    const label = status === 'pass' ? 'PASS' : 
-                  status === 'fail' ? 'FAIL' : 
-                  status === 'warning' ? 'WARN' : 'CHECK';
-    
+    const variant = status === 'pass' ? 'default' :
+      status === 'fail' && critical ? 'destructive' :
+        status === 'warning' ? 'secondary' : 'outline';
+
+    const label = status === 'pass' ? 'PASS' :
+      status === 'fail' ? 'FAIL' :
+        status === 'warning' ? 'WARN' : 'CHECK';
+
     return <Badge variant={variant} className="ml-2">{label}</Badge>;
   };
 
@@ -184,9 +190,9 @@ export const LaunchReadinessChecker = () => {
             Security and functionality checks for production deployment
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={runSecurityChecks}
           disabled={loading}
         >
@@ -198,7 +204,7 @@ export const LaunchReadinessChecker = () => {
           Recheck
         </Button>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
@@ -220,14 +226,13 @@ export const LaunchReadinessChecker = () => {
         <div className="space-y-2">
           <h4 className="font-medium text-foreground mb-3">Security Checks</h4>
           {checks.map((check) => (
-            <div 
+            <div
               key={check.id}
-              className={`p-3 rounded-lg border ${
-                check.status === 'fail' && check.critical ? 'border-red-200 bg-red-50' :
+              className={`p-3 rounded-lg border ${check.status === 'fail' && check.critical ? 'border-red-200 bg-red-50' :
                 check.status === 'warning' ? 'border-yellow-200 bg-yellow-50' :
-                check.status === 'pass' ? 'border-green-200 bg-green-50' :
-                'border-border'
-              }`}
+                  check.status === 'pass' ? 'border-green-200 bg-green-50' :
+                    'border-border'
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
