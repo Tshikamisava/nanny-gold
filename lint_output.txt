@@ -118,6 +118,12 @@ C:\Users\Mzwandie\Videos\nanny-gold\src\components\ChatSystemTester.tsx
   27:6   warning  React Hook useEffect has a missing dependency: 'runChatTests'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
   91:14  error    'error' is defined but never used                                                                                @typescript-eslint/no-unused-vars
 
+C:\Users\Mzwandie\Videos\nanny-gold\src\components\ClientProfileGate.tsx
+   44:50  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+   79:34  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  114:17  error  'hasChildren' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  130:19  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+
 C:\Users\Mzwandie\Videos\nanny-gold\src\components\ComprehensiveTestReport.tsx
    8:3  error  'AlertTriangle' is defined but never used  @typescript-eslint/no-unused-vars
    9:3  error  'XCircle' is defined but never used        @typescript-eslint/no-unused-vars
@@ -190,7 +196,7 @@ C:\Users\Mzwandie\Videos\nanny-gold\src\components\JitsiMeetRoom.tsx
 C:\Users\Mzwandie\Videos\nanny-gold\src\components\LaunchReadinessChecker.tsx
    21:11  error    'toast' is assigned a value but never used                                                                            @typescript-eslint/no-unused-vars
   106:27  error    'session' is assigned a value but never used                                                                          @typescript-eslint/no-unused-vars
-  148:6   warning  React Hook useEffect has a missing dependency: 'runSecurityChecks'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  146:6   warning  React Hook useEffect has a missing dependency: 'runSecurityChecks'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
 
 C:\Users\Mzwandie\Videos\nanny-gold\src\components\LiveChatEscalation.tsx
    12:3  error    'User' is defined but never used                                                                                                                                            @typescript-eslint/no-unused-vars
@@ -1511,6 +1517,6 @@ C:\Users\Mzwandie\Videos\nanny-gold\supabase\functions\update-password\index.ts
 C:\Users\Mzwandie\Videos\nanny-gold\supabase\functions\verify-email-otp\index.ts
   247:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-Γ£û 1026 problems (959 errors, 67 warnings)
+Γ£û 1030 problems (963 errors, 67 warnings)
   7 errors and 0 warnings potentially fixable with the `--fix` option.
 

@@ -22,7 +22,7 @@ interface FormData {
   phone: string;
   password: string;
   confirmPassword: string;
-  
+
   // Profile data
   location: string;
   numberOfChildren: number;
@@ -40,7 +40,7 @@ const SignupWithProfile = () => {
   const { toast } = useToast();
   const { signUp } = useAuth();
   const { updatePreferences } = useBooking();
-  
+
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -48,7 +48,7 @@ const SignupWithProfile = () => {
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [passwordStrength, setPasswordStrength] = useState(0);
-  
+
   const [formData, setFormData] = useState<FormData>({
     // Auth data
     firstName: '',
@@ -57,7 +57,7 @@ const SignupWithProfile = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    
+
     // Profile data
     location: '',
     numberOfChildren: 0,
@@ -126,7 +126,7 @@ const SignupWithProfile = () => {
       setEmailChecking(false);
     }
   };
-  };
+
 
   const calculatePasswordStrength = (password: string) => {
     let strength = 0;
@@ -282,7 +282,7 @@ const SignupWithProfile = () => {
         },
         backupNanny: false
       };
-      
+
       updatePreferences(profileData);
 
       // Save to database for persistence - use user ID from signup
@@ -329,7 +329,7 @@ const SignupWithProfile = () => {
             className="rounded-xl border-border focus:border-primary"
           />
         </div>
-        
+
         <Input
           type="tel"
           placeholder="Phone Number"
@@ -337,7 +337,7 @@ const SignupWithProfile = () => {
           onChange={(e) => updateForm('phone', e.target.value)}
           className="rounded-xl border-border focus:border-primary"
         />
-        
+
         <div className="relative">
           <Input
             type="email"
@@ -369,7 +369,7 @@ const SignupWithProfile = () => {
             <p className="text-xs text-destructive mt-1">This email is already registered</p>
           )}
         </div>
-        
+
         <div className="space-y-2">
           <div className="relative">
             <Input
@@ -435,7 +435,7 @@ const SignupWithProfile = () => {
         {formData.confirmPassword && formData.password !== formData.confirmPassword && (
           <p className="text-xs text-destructive">Passwords do not match</p>
         )}
-        
+
         <Button
           onClick={handleNextStep}
           disabled={!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || emailAvailable === false || formData.password !== formData.confirmPassword}
@@ -443,7 +443,7 @@ const SignupWithProfile = () => {
         >
           Next Step <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
-        
+
         <div className="text-center mt-4">
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
@@ -571,20 +571,20 @@ const SignupWithProfile = () => {
             <SelectTrigger className="rounded-xl border-primary/20 focus:border-primary/40 focus:ring-2 focus:ring-primary/20 h-12">
               <SelectValue placeholder="Select your home size" />
             </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pocket_palace">
-                    Pocket Palace (&lt;120m² of cosy 2 bedrooms, snug kitchen, living spot.)
-                  </SelectItem>
-                  <SelectItem value="family_hub">
-                    Family Hub (120m² - 200m², usually 3/4 snug bedrooms, kitchen, living &amp; dining)
-                  </SelectItem>
-                  <SelectItem value="grand_estate">
-                    Grand Estate (200m² - 300m², usually sprawling 3/4+ bedrooms, extra lounge or office, roomy kitchen)
-                  </SelectItem>
-                  <SelectItem value="monumental_manor">
-                    Monumental Manor (&gt;300m², usually palatial 5+ bedrooms, more lounges than you can count, gyms, libraries, and wings)
-                  </SelectItem>
-                </SelectContent>
+            <SelectContent>
+              <SelectItem value="pocket_palace">
+                Pocket Palace (&lt;120m² of cosy 2 bedrooms, snug kitchen, living spot.)
+              </SelectItem>
+              <SelectItem value="family_hub">
+                Family Hub (120m² - 200m², usually 3/4 snug bedrooms, kitchen, living &amp; dining)
+              </SelectItem>
+              <SelectItem value="grand_estate">
+                Grand Estate (200m² - 300m², usually sprawling 3/4+ bedrooms, extra lounge or office, roomy kitchen)
+              </SelectItem>
+              <SelectItem value="monumental_manor">
+                Monumental Manor (&gt;300m², usually palatial 5+ bedrooms, more lounges than you can count, gyms, libraries, and wings)
+              </SelectItem>
+            </SelectContent>
           </Select>
         </div>
 
@@ -595,7 +595,7 @@ const SignupWithProfile = () => {
               Select additional services you need
             </p>
           </div>
-          
+
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors">
               <span className="text-sm text-foreground font-medium">Diverse Ability support</span>
@@ -605,13 +605,13 @@ const SignupWithProfile = () => {
               />
             </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors">
-                <span className="text-sm text-foreground font-medium">Driving support</span>
-                <Switch
-                  checked={formData.drivingSupport}
-                  onCheckedChange={(checked) => updateForm('drivingSupport', checked)}
-                />
-              </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors">
+              <span className="text-sm text-foreground font-medium">Driving support</span>
+              <Switch
+                checked={formData.drivingSupport}
+                onCheckedChange={(checked) => updateForm('drivingSupport', checked)}
+              />
+            </div>
 
             <div className="flex items-center justify-between p-3 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors">
               <span className="text-sm text-foreground font-medium">Food Prep</span>
