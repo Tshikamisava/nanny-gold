@@ -652,7 +652,7 @@ const SimpleAuthScreen = () => {
                 /* Main Login/Signup Form */
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* HIDDEN: Signup Method Selector - kept for post-launch */}
-                  {false && !isLogin && (
+                  {/* { !isLogin && (
                     <div className="flex bg-muted rounded-lg p-1 mb-6">
                       <Button
                         type="button"
@@ -675,7 +675,7 @@ const SimpleAuthScreen = () => {
                         Phone
                       </Button>
                     </div>
-                  )}
+                  )} */ }
 
                   {!isLogin && (
                     <>
@@ -944,8 +944,8 @@ const SimpleAuthScreen = () => {
             Need Help?
           </button>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
