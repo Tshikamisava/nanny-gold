@@ -7,7 +7,7 @@ import { ArrowLeft, Loader2, X } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency, getBookingTypeRate, isHourlyBasedBooking, isDailyBasedBooking, calculateHourlyPricing, calculateDailyPricing, type HourlyPricingResult } from "@/utils/pricingUtils";
+import { formatCurrency, isHourlyBasedBooking, isDailyBasedBooking, calculateHourlyPricing, calculateDailyPricing, type HourlyPricingResult } from "@/utils/pricingUtils";
 import { PlacementFeeDialog } from "@/components/PlacementFeeDialog";
 import { extractBookingDetails, cleanPreferences } from "@/utils/valueUtils";
 import { calculateAndStoreBookingFinancials } from "@/services/bookingService";
@@ -34,7 +34,7 @@ const PaymentScreen = () => {
   // Extract booking details safely without creating circular references
   const {
     bookingSubType,
-    durationType,
+    // durationType unused here
     selectedDates,
     timeSlots
   } = useMemo(() => extractBookingDetails(preferences), [preferences]);
@@ -45,43 +45,43 @@ const PaymentScreen = () => {
   // Check booking type with cleaned preferences
   const isHourlyBooking = cleanedPreferences?.bookingSubType && isHourlyBasedBooking(cleanedPreferences.bookingSubType);
   const isDailyBooking = cleanedPreferences?.bookingSubType && isDailyBasedBooking(cleanedPreferences.bookingSubType);
-  
+
   const isLongTermBooking = (() => {
     // Primary check: explicit durationType - THIS TAKES PRECEDENCE
     if (cleanedPreferences?.durationType === 'long_term') {
       console.log('✅ Long-term booking confirmed by durationType');
       return true;
     }
-    
+
     // Secondary check: exclude known short-term booking types ONLY if durationType is not long_term
     const shortTermTypes = ['date_night', 'date_day', 'emergency', 'temporary_support', 'school_holiday'];
     if (cleanedPreferences?.bookingSubType && shortTermTypes.includes(cleanedPreferences.bookingSubType)) {
       console.log('❌ Short-term booking detected by bookingSubType:', cleanedPreferences.bookingSubType);
       return false;
     }
-    
+
     // Tertiary check: if durationType is explicitly short_term
     if (cleanedPreferences?.durationType === 'short_term') {
       return false;
     }
-    
+
     // Quaternary check: presence of long-term indicators
     if (cleanedPreferences?.livingArrangement && cleanedPreferences?.homeSize) {
       return true;
     }
-    
+
     // Final fallback: Check URL or localStorage for booking flow context
     try {
       const urlPath = window.location.pathname;
       const bookingFlow = localStorage.getItem('bookingFlow');
-      
+
       if (urlPath.includes('living-arrangement') || bookingFlow === 'long-term') {
         return true;
       }
     } catch (error) {
       console.error('Error checking booking flow context:', error);
     }
-    
+
     // Default to false if we can't determine
     console.warn('⚠️ Could not determine booking type, defaulting to short-term');
     return false;
@@ -263,7 +263,7 @@ const PaymentScreen = () => {
     const fetchHourlyPricing = async () => {
       try {
         const pricing = await calculateHourlyPricing(
-          bookingSubType as 'emergency' | 'date_night' | 'date_day' | 'school_holiday', 
+          bookingSubType as 'emergency' | 'date_night' | 'date_day' | 'school_holiday',
           totalHours,
           hourlyServices,
           limitedSelectedDates,
@@ -296,8 +296,8 @@ const PaymentScreen = () => {
 
   // Calculate pricing based on booking type and user selections
   const pricing = isLongTermBooking ? calculateNannySpecificPricing(selectedNanny) : null;
-  
-  
+
+
 
   const { loadProfileFromDatabase } = useBooking();
 
@@ -315,21 +315,21 @@ const PaymentScreen = () => {
   // Calculate placement fee based on home size
   const calculatePlacementFee = (homeSize: string, baseRate: number): number => {
     const mappedSize = homeSize?.toLowerCase().replace(/[- ]/g, '_') || 'family_hub';
-    
+
     // Flat R2,500 for standard homes (Pocket Palace, Family Hub)
     if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
       return 2500;
     }
-    
+
     // 50% of base rate for premium estates (Grand Estate, Monumental Manor, Epic Estates)
     if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
       return Math.round(baseRate * 0.5);
     }
-    
+
     return 2500; // Default fallback
   };
 
-  const placementFee = isLongTermBooking && monthlyPricing 
+  const placementFee = isLongTermBooking && monthlyPricing
     ? calculatePlacementFee(cleanedPreferences.homeSize, monthlyPricing.baseRate)
     : 0;
 
@@ -338,9 +338,9 @@ const PaymentScreen = () => {
     if (!isDailyBooking || !selectedDates || !bookingSubType) {
       return null;
     }
-    return calculateDailyPricing(selectedDates, bookingSubType, preferences.homeSize, { 
-      cooking: cleanedPreferences?.cooking, 
-      specialNeeds: cleanedPreferences?.specialNeeds, 
+    return calculateDailyPricing(selectedDates, bookingSubType, preferences.homeSize, {
+      cooking: cleanedPreferences?.cooking,
+      specialNeeds: cleanedPreferences?.specialNeeds,
       drivingSupport: cleanedPreferences?.drivingSupport
     });
   }, [
@@ -354,7 +354,7 @@ const PaymentScreen = () => {
   ]);
   const isHourlyPricingPending = isPricingLoading && !hourlyPricing;
   const isDailyPricingPending = isPricingLoading && !dailyPricing;
-  
+
   const selectedNannyName = selectedNanny?.profiles ? `${selectedNanny.profiles.first_name} ${selectedNanny.profiles.last_name}` : 'Selected Nanny';
   // Removed card processing - payment now goes directly to EFT
 
@@ -398,7 +398,7 @@ const PaymentScreen = () => {
         });
         return;
       }
-      
+
       if (!cleanedPreferences?.homeSize || !cleanedPreferences?.livingArrangement) {
         toast({
           title: "Missing Information",
@@ -421,7 +421,7 @@ const PaymentScreen = () => {
     }
 
     setIsProcessing(true);
-    
+
     try {
       console.log('💳 Creating booking with data:', {
         userId: user.id,
@@ -507,15 +507,11 @@ const PaymentScreen = () => {
           dailyPricing: dailyPricing?.total,
           placementFee
         });
-        navigate('/eft-payment', { 
-          state: { 
+        navigate('/eft-payment', {
+          state: {
             bookingId: existingBookings[0].id,
             pricingData,
-<<<<<<< HEAD
             amount: amountDue,
-=======
-            amount: isLongTermBooking ? placementFee : pricingData?.total, // Explicit amount for EFT screen
->>>>>>> cdf33e0bd959ee49177c1009cb0bb398d478991c
             nannyName: selectedNannyName,
             bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
           }
@@ -571,7 +567,7 @@ const PaymentScreen = () => {
       console.log('💰 Pre-navigation pricing check:', {
         isHourlyBooking,
         hourlyPricing: hourlyPricing?.total,
-        isDailyBooking, 
+        isDailyBooking,
         dailyPricing: dailyPricing?.total,
         isLongTermBooking,
         monthlyPricing: monthlyPricing?.total,
@@ -589,15 +585,11 @@ const PaymentScreen = () => {
 
       // Redirect to EFT payment screen with booking ID and explicit amount
       // CRITICAL: amountDue is calculated directly from the pricing objects shown on screen
-      navigate('/eft-payment', { 
-        state: { 
+      navigate('/eft-payment', {
+        state: {
           bookingId: booking.id,
           pricingData,
-<<<<<<< HEAD
           amount: amountDue, // This is the exact amount shown on the "Pay R..." button
-=======
-          amount: isLongTermBooking ? placementFee : pricingData?.total, // Explicit amount for EFT screen
->>>>>>> cdf33e0bd959ee49177c1009cb0bb398d478991c
           nannyName: selectedNannyName,
           bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
         }
@@ -614,168 +606,168 @@ const PaymentScreen = () => {
     }
   };
   return <div className="min-h-screen bg-background px-6 py-8">
-      <div className="max-w-sm mx-auto">
-        {/* Navigation Header */}
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/match-results')} className="text-primary hover:bg-accent">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex space-x-2">
-            <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
-            <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
-            <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
-            <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
-            <div className="w-2 h-2 bg-secondary rounded-full"></div>
-          </div>
-          <div className="w-10 h-10"></div> {/* Spacer */}
+    <div className="max-w-sm mx-auto">
+      {/* Navigation Header */}
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/match-results')} className="text-primary hover:bg-accent">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
+          <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
+          <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
+          <div className="w-2 h-2 bg-primary/30 rounded-full"></div>
+          <div className="w-2 h-2 bg-secondary rounded-full"></div>
         </div>
+        <div className="w-10 h-10"></div> {/* Spacer */}
+      </div>
 
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            Payment Summary
-          </h1>
-          <p className="text-muted-foreground">
-            Booking with {selectedNannyName}
-          </p>
-        </div>
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-foreground mb-2">
+          Payment Summary
+        </h1>
+        <p className="text-muted-foreground">
+          Booking with {selectedNannyName}
+        </p>
+      </div>
 
-        <Card className="rounded-xl royal-shadow mb-6 border-border">
-          <CardHeader className="bg-primary/5 rounded-t-xl border-b border-border">
-            <CardTitle className="text-primary">Service Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 p-6">
-            {isHourlyBooking && hourlyPricing ?
-          // Hourly pricing breakdown
-          <>
-                {preferences?.bookingSubType !== 'date_day' && <div className="flex justify-between">
-                    <span className="text-foreground">Base Hourly Rate</span>
+      <Card className="rounded-xl royal-shadow mb-6 border-border">
+        <CardHeader className="bg-primary/5 rounded-t-xl border-b border-border">
+          <CardTitle className="text-primary">Service Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-6">
+          {isHourlyBooking && hourlyPricing ?
+            // Hourly pricing breakdown
+            <>
+              {preferences?.bookingSubType !== 'date_day' && <div className="flex justify-between">
+                <span className="text-foreground">Base Hourly Rate</span>
+                <span className="font-medium text-foreground">
+                  {formatCurrency(hourlyPricing.baseHourlyRate)}/hr
+                </span>
+              </div>}
+
+              {/* BASE RATE SECTION - Shows first for date_day bookings */}
+              {(preferences?.bookingSubType === 'date_day') && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-foreground">Hourly Care</span>
                     <span className="font-medium text-foreground">
-                      {formatCurrency(hourlyPricing.baseHourlyRate)}/hr
+                      {(() => {
+                        // Calculate actual daily hours from time slots
+                        const dailyHours = preferences.timeSlots?.reduce((total: number, slot: any) => {
+                          const start = new Date(`2000-01-01T${slot.start}:00`);
+                          const end = new Date(`2000-01-01T${slot.end}:00`);
+                          const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                          return total + hours;
+                        }, 0) || 8;
+                        return `${dailyHours}hrs × ${formatCurrency(hourlyPricing.baseHourlyRate)}/hr = ${formatCurrency(hourlyPricing.baseHourlyRate * dailyHours)}`;
+                      })()}
                     </span>
-                  </div>}
+                  </div>
 
-                {/* BASE RATE SECTION - Shows first for date_day bookings */}
-                {(preferences?.bookingSubType === 'date_day') && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-foreground">Hourly Care</span>
-                      <span className="font-medium text-foreground">
+                  {/* Day-of-week indicator */}
+                  {selectedDates && selectedDates.length === 1 && (
+                    <div className="flex justify-between text-sm text-muted-foreground pt-1">
+                      <span>
                         {(() => {
-                          // Calculate actual daily hours from time slots
-                          const dailyHours = preferences.timeSlots?.reduce((total: number, slot: any) => {
-                            const start = new Date(`2000-01-01T${slot.start}:00`);
-                            const end = new Date(`2000-01-01T${slot.end}:00`);
-                            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                            return total + hours;
-                          }, 0) || 8;
-                          return `${dailyHours}hrs × ${formatCurrency(hourlyPricing.baseHourlyRate)}/hr = ${formatCurrency(hourlyPricing.baseHourlyRate * dailyHours)}`;
+                          const date = new Date(selectedDates[0]);
+                          // Convert to SAST timezone (UTC+2) for accurate display
+                          const sastOffset = 2 * 60;
+                          const sastDate = new Date(date.getTime() + sastOffset * 60 * 1000);
+                          const dayOfWeek = sastDate.getUTCDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
+                          const dayName = sastDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+                          return `${dayName} (${isWeekend ? 'Weekend Rate: R55/hr' : 'Weekday Rate: R40/hr'})`;
                         })()}
                       </span>
                     </div>
-                    
-                    {/* Day-of-week indicator */}
-                    {selectedDates && selectedDates.length === 1 && (
-                      <div className="flex justify-between text-sm text-muted-foreground pt-1">
-                        <span>
-                          {(() => {
-                            const date = new Date(selectedDates[0]);
-                            // Convert to SAST timezone (UTC+2) for accurate display
-                            const sastOffset = 2 * 60;
-                            const sastDate = new Date(date.getTime() + sastOffset * 60 * 1000);
-                            const dayOfWeek = sastDate.getUTCDay();
-                            const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
-                            const dayName = sastDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-                            return `${dayName} (${isWeekend ? 'Weekend Rate: R55/hr' : 'Weekday Rate: R40/hr'})`;
-                          })()}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
+                  )}
+                </>
+              )}
 
-                {/* ADD-ON SERVICES SECTION - Shows second */}
-                {hourlyPricing.services && hourlyPricing.services.length > 0 && (
-                  <div className="space-y-2 border-t border-border pt-3 mt-3">
-                    <h4 className="text-sm font-medium text-foreground">Add-on Services</h4>
-                    {hourlyPricing.services.map((service, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              // Toggle service and recalculate pricing
-                              const serviceKey = service.name.toLowerCase().includes('cooking') ? 'cooking' :
-                                               service.name.toLowerCase().includes('diverse') ? 'specialNeeds' :
-                                               service.name.toLowerCase().includes('driving') ? 'drivingSupport' :
-                                               service.name.toLowerCase().includes('housekeeping') ? 'householdSupport' : null;
-                              
-                              if (serviceKey && serviceKey !== 'householdSupport') {
-                                updatePreferences({ [serviceKey]: false });
-                              } else if (serviceKey === 'householdSupport') {
-                                const current = preferences.householdSupport || [];
-                                updatePreferences({ 
-                                  householdSupport: current.filter(item => item !== 'light-housekeeping') 
-                                });
-                              }
-                            }}
-                            className="text-destructive hover:text-destructive p-1 h-6 w-6"
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                           <div className="flex flex-col">
-                            <span className="text-sm text-foreground">{service.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {service.name.toLowerCase().includes('housekeeping') || service.name.toLowerCase().includes('cooking')
-                                ? `${formatCurrency(service.hourlyRate)}/day`
-                                : `${formatCurrency(service.hourlyRate)}/hr`
-                              }
-                            </span>
-                          </div>
+              {/* ADD-ON SERVICES SECTION - Shows second */}
+              {hourlyPricing.services && hourlyPricing.services.length > 0 && (
+                <div className="space-y-2 border-t border-border pt-3 mt-3">
+                  <h4 className="text-sm font-medium text-foreground">Add-on Services</h4>
+                  {hourlyPricing.services.map((service, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            // Toggle service and recalculate pricing
+                            const serviceKey = service.name.toLowerCase().includes('cooking') ? 'cooking' :
+                              service.name.toLowerCase().includes('diverse') ? 'specialNeeds' :
+                                service.name.toLowerCase().includes('driving') ? 'drivingSupport' :
+                                  service.name.toLowerCase().includes('housekeeping') ? 'householdSupport' : null;
+
+                            if (serviceKey && serviceKey !== 'householdSupport') {
+                              updatePreferences({ [serviceKey]: false });
+                            } else if (serviceKey === 'householdSupport') {
+                              const current = preferences.householdSupport || [];
+                              updatePreferences({
+                                householdSupport: current.filter(item => item !== 'light-housekeeping')
+                              });
+                            }
+                          }}
+                          className="text-destructive hover:text-destructive p-1 h-6 w-6"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                        <div className="flex flex-col">
+                          <span className="text-sm text-foreground">{service.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {service.name.toLowerCase().includes('housekeeping') || service.name.toLowerCase().includes('cooking')
+                              ? `${formatCurrency(service.hourlyRate || 0)}/day`
+                              : `${formatCurrency(service.hourlyRate || 0)}/hr`
+                            }
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-foreground">
-                          +{formatCurrency(service.totalCost)}
-                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="border-t border-border pt-4">
-                  <div className="flex justify-between">
-                    <span className="text-foreground">Subtotal</span>
-                    <span className="font-medium text-foreground">
-                      {formatCurrency(hourlyPricing.subtotal)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Service Fee</span>
-                    <span className="font-medium text-foreground">
-                      {formatCurrency(hourlyPricing.serviceFee)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-lg font-semibold mb-6">
-                    <span className="text-foreground">Total Cost</span>
-                    <span className="text-secondary">
-                      {formatCurrency(hourlyPricing.total)}
-                    </span>
-                  </div>
+                      <span className="text-sm font-medium text-foreground">
+                        +{formatCurrency(service.totalCost || 0)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                
-                
+              )}
 
-                <Button onClick={handlePayment} disabled={isProcessing || isHourlyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
-                  {isProcessing ? <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Processing...
-                    </> : isHourlyPricingPending ? <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Calculating pricing...
-                    </> : `Pay R${hourlyPricing.total.toLocaleString()}`}
-                </Button>
-              </> : isDailyBooking && dailyPricing ?
-          // Daily pricing breakdown (Gap Coverage)
-          <>
+              <div className="border-t border-border pt-4">
+                <div className="flex justify-between">
+                  <span className="text-foreground">Subtotal</span>
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(hourlyPricing.subtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Service Fee</span>
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(hourlyPricing.serviceFee)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-lg font-semibold mb-6">
+                  <span className="text-foreground">Total Cost</span>
+                  <span className="text-secondary">
+                    {formatCurrency(hourlyPricing.total)}
+                  </span>
+                </div>
+              </div>
+
+
+
+              <Button onClick={handlePayment} disabled={isProcessing || isHourlyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
+                {isProcessing ? <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Processing...
+                </> : isHourlyPricingPending ? <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Calculating pricing...
+                </> : `Pay R${hourlyPricing.total.toLocaleString()}`}
+              </Button>
+            </> : isDailyBooking && dailyPricing ?
+              // Daily pricing breakdown (Gap Coverage)
+              <>
                 <div className="flex justify-between">
                   <span className="text-foreground">Total Days</span>
                   <span className="font-medium text-foreground">
@@ -802,158 +794,158 @@ const PaymentScreen = () => {
                       {formatCurrency(dailyPricing.total)}
                     </span>
                   </div>
-                  
-                  
+
+
 
                   <Button onClick={handlePayment} disabled={isProcessing || isDailyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
                     {isProcessing ? <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Processing...
-                      </> : isDailyPricingPending ? <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Calculating pricing...
-                      </> : `Pay R${dailyPricing.total.toLocaleString()}`}
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Processing...
+                    </> : isDailyPricingPending ? <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Calculating pricing...
+                    </> : `Pay R${dailyPricing.total.toLocaleString()}`}
                   </Button>
                 </div>
               </> : !isHourlyBooking && !isDailyBooking && monthlyPricing ?
-          // Long-term booking breakdown with authorization/capture flow
-          <>
-                <div className="flex justify-between">
-                  <span className="text-foreground">Monthly Base Rate</span>
-                  <span className="font-medium text-foreground">
-                    R{monthlyPricing.baseRate.toLocaleString()}
-                  </span>
-                </div>
-
-                {monthlyPricing.addOns && monthlyPricing.addOns.length > 0 && (
-                  <div className="space-y-2 border-t border-border pt-3 mt-3">
-                    <h4 className="text-sm font-medium text-foreground">Add-on Services</h4>
-                    {monthlyPricing.addOns.map((addon, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              // Toggle service and recalculate pricing
-                              const serviceKey = addon.name.toLowerCase().includes('cooking') || addon.name.toLowerCase().includes('food') ? 'cooking' :
-                                               addon.name.toLowerCase().includes('diverse') || addon.name.toLowerCase().includes('special') ? 'specialNeeds' :
-                                               addon.name.toLowerCase().includes('driving') ? 'drivingSupport' :
-                                               addon.name.toLowerCase().includes('backup') ? 'backupNanny' :
-                                               addon.name.toLowerCase().includes('montessori') ? 'montessori' :
-                                               addon.name.toLowerCase().includes('ecd') ? 'ecdTraining' : null;
-                              
-                              if (serviceKey) {
-                                updatePreferences({ [serviceKey]: false });
-                              }
-                            }}
-                            className="text-destructive hover:text-destructive p-1 h-6 w-6"
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                          <span className="text-sm text-foreground">+{addon.name}</span>
-                        </div>
-                        <span className="text-sm font-medium text-secondary">
-                          {addon.price === 0 ? 'Free' : `+R${addon.price.toLocaleString()}`}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="border-t border-border pt-4 mb-4">
+                // Long-term booking breakdown with authorization/capture flow
+                <>
                   <div className="flex justify-between">
-                    <span className="text-foreground">Monthly Total</span>
+                    <span className="text-foreground">Monthly Base Rate</span>
                     <span className="font-medium text-foreground">
-                      R{monthlyPricing.total.toLocaleString()}
+                      R{monthlyPricing.baseRate.toLocaleString()}
                     </span>
                   </div>
-                </div>
-                
-                {/* Payment breakdown */}
-                <div className="bg-primary/5 rounded-lg p-4 mb-4 border border-primary/20">
-                  <h3 className="font-semibold text-foreground mb-3">Payment Schedule</h3>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-foreground">Due Today</span>
-                    <span className="font-semibold text-secondary text-lg">
-                      {placementFee.toLocaleString()} placement fee
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-foreground">Reserved (Month-end)</span>
-                    <span className="font-medium text-foreground">
-                      R{monthlyPricing.total.toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Monthly service fee reserved, charged at month-end
-                  </p>
-                </div>
 
-                {!placementFeeAccepted && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowPlacementDialog(true)} 
-                    className="w-full mb-4 border-primary text-primary hover:bg-primary hover:text-white"
+                  {monthlyPricing.addOns && monthlyPricing.addOns.length > 0 && (
+                    <div className="space-y-2 border-t border-border pt-3 mt-3">
+                      <h4 className="text-sm font-medium text-foreground">Add-on Services</h4>
+                      {monthlyPricing.addOns.map((addon, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                // Toggle service and recalculate pricing
+                                const serviceKey = addon.name.toLowerCase().includes('cooking') || addon.name.toLowerCase().includes('food') ? 'cooking' :
+                                  addon.name.toLowerCase().includes('diverse') || addon.name.toLowerCase().includes('special') ? 'specialNeeds' :
+                                    addon.name.toLowerCase().includes('driving') ? 'drivingSupport' :
+                                      addon.name.toLowerCase().includes('backup') ? 'backupNanny' :
+                                        addon.name.toLowerCase().includes('montessori') ? 'montessori' :
+                                          addon.name.toLowerCase().includes('ecd') ? 'ecdTraining' : null;
+
+                                if (serviceKey) {
+                                  updatePreferences({ [serviceKey]: false });
+                                }
+                              }}
+                              className="text-destructive hover:text-destructive p-1 h-6 w-6"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                            <span className="text-sm text-foreground">+{addon.name}</span>
+                          </div>
+                          <span className="text-sm font-medium text-secondary">
+                            {addon.price === 0 ? 'Free' : `+R${addon.price.toLocaleString()}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="border-t border-border pt-4 mb-4">
+                    <div className="flex justify-between">
+                      <span className="text-foreground">Monthly Total</span>
+                      <span className="font-medium text-foreground">
+                        R{monthlyPricing.total.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment breakdown */}
+                  <div className="bg-primary/5 rounded-lg p-4 mb-4 border border-primary/20">
+                    <h3 className="font-semibold text-foreground mb-3">Payment Schedule</h3>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-foreground">Due Today</span>
+                      <span className="font-semibold text-secondary text-lg">
+                        {placementFee.toLocaleString()} placement fee
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-foreground">Reserved (Month-end)</span>
+                      <span className="font-medium text-foreground">
+                        R{monthlyPricing.total.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Monthly service fee reserved, charged at month-end
+                    </p>
+                  </div>
+
+                  {!placementFeeAccepted && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPlacementDialog(true)}
+                      className="w-full mb-4 border-primary text-primary hover:bg-primary hover:text-white"
+                    >
+                      Learn About Placement Fee
+                    </Button>
+                  )}
+
+                  <Button
+                    onClick={handlePayment}
+                    disabled={isProcessing || (!placementFeeAccepted && isLongTermBooking)}
+                    className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg"
                   >
-                    Learn About Placement Fee
-                  </Button>
-                )}
-
-                <Button 
-                  onClick={handlePayment} 
-                  disabled={isProcessing || (!placementFeeAccepted && isLongTermBooking)} 
-                  className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg"
-                >
-                  {isProcessing ? <>
+                    {isProcessing ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Processing...
                     </> : `Pay ${placementFee.toLocaleString()} placement fee`}
-                </Button>
-              </> : <div className="text-center py-8">
-                <div className="space-y-4">
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-muted rounded w-3/4 mx-auto mb-2"></div>
-                    <div className="h-4 bg-muted rounded w-1/2 mx-auto"></div>
+                  </Button>
+                </> : <div className="text-center py-8">
+                  <div className="space-y-4">
+                    <div className="animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4 mx-auto mb-2"></div>
+                      <div className="h-4 bg-muted rounded w-1/2 mx-auto"></div>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      {isLongTermBooking && (!preferences?.homeSize || !preferences?.livingArrangement)
+                        ? 'Loading your profile and preferences...'
+                        : isHourlyBooking
+                          ? 'Calculating hourly pricing...'
+                          : 'Calculating pricing...'}
+                    </p>
+                    {isLongTermBooking && (!preferences?.homeSize || !preferences?.livingArrangement) && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Missing critical preferences. Loading from database...
+                      </p>
+                    )}
+                    {isHourlyBooking && !hourlyPricing && preferences?.bookingSubType && (
+                      <p className="text-xs text-red-500 mt-2">
+                        Error: Hourly pricing failed to load. Booking type: {preferences?.bookingSubType}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-muted-foreground text-sm">
-                    {isLongTermBooking && (!preferences?.homeSize || !preferences?.livingArrangement) 
-                      ? 'Loading your profile and preferences...' 
-                      : isHourlyBooking 
-                        ? 'Calculating hourly pricing...' 
-                        : 'Calculating pricing...'}
-                  </p>
-                  {isLongTermBooking && (!preferences?.homeSize || !preferences?.livingArrangement) && (
-                    <p className="text-xs text-amber-600 mt-2">
-                      Missing critical preferences. Loading from database...
-                    </p>
-                  )}
-                  {isHourlyBooking && !hourlyPricing && preferences?.bookingSubType && (
-                    <p className="text-xs text-red-500 mt-2">
-                      Error: Hourly pricing failed to load. Booking type: {preferences?.bookingSubType}
-                    </p>
-                  )}
-                </div>
-              </div>}
-          </CardContent>
-        </Card>
+                </div>}
+        </CardContent>
+      </Card>
 
-        
-                <PlacementFeeDialog 
-          isOpen={showPlacementDialog}
-          onOpenChange={(open) => {
-            setShowPlacementDialog(open);
-            // Stay on payment screen when dialog closes
-          }}
-          onAccept={() => {
-            setPlacementFeeAccepted(true);
-            setShowPlacementDialog(false);
-            // Stay on payment screen after accepting
-          }}
-        />
-      </div>
+
+      <PlacementFeeDialog
+        isOpen={showPlacementDialog}
+        onOpenChange={(open) => {
+          setShowPlacementDialog(open);
+          // Stay on payment screen when dialog closes
+        }}
+        onAccept={() => {
+          setPlacementFeeAccepted(true);
+          setShowPlacementDialog(false);
+          // Stay on payment screen after accepting
+        }}
+      />
     </div>
+  </div>
 };
 export default PaymentScreen;

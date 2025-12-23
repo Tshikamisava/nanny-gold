@@ -40,14 +40,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Clean phone number (remove non-digits) - MUST match send-sms-otp formatting exactly
     let cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     // Handle different input formats - EXACTLY like send-sms-otp
     if (cleanPhone.startsWith('0')) {
       // Convert 0xxxxxxxxx to 27xxxxxxxxx
       cleanPhone = '27' + cleanPhone.substring(1);
     } else if (cleanPhone.startsWith('27')) {
       // Already has country code, keep as is
-      cleanPhone = cleanPhone;
     } else if (cleanPhone.length === 9) {
       // Assume it's a local number, add country code
       cleanPhone = '27' + cleanPhone;
@@ -55,9 +54,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Must be exactly 11 digits total (27 + 9 local digits)
     if (cleanPhone.length !== 11 || !cleanPhone.startsWith('27')) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: `Invalid South African phone number format. Use +27xxxxxxxxx format (currently ${cleanPhone.length} digits)` 
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Invalid South African phone number format. Use +27xxxxxxxxx format (currently ${cleanPhone.length} digits)`
       }), {
         status: 400,
         headers: corsHeaders,
@@ -101,34 +100,34 @@ const handler = async (req: Request): Promise<Response> => {
           .select('id, email')
           .eq('phone', formattedPhone)
           .single();
-          
+
         if (profileError || !profile) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "No account found with this phone number" 
+          return new Response(JSON.stringify({
+            success: false,
+            error: "No account found with this phone number"
           }), {
             status: 400,
             headers: corsHeaders,
           });
         }
-        
+
         // Create session for existing user
         const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
           email: profile.email,
         });
-        
+
         if (sessionError) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Failed to create session" 
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Failed to create session"
           }), {
             status: 500,
             headers: corsHeaders,
           });
         }
-        
-        return new Response(JSON.stringify({ 
+
+        return new Response(JSON.stringify({
           success: true,
           user: { id: profile.id },
           session: sessionData.properties?.session || sessionData.properties,
@@ -141,7 +140,7 @@ const handler = async (req: Request): Promise<Response> => {
         // Create new user account with unique email
         const timestamp = Date.now();
         const tempEmail = `${formattedPhone}-${timestamp}@temp-phone-auth.local`;
-        
+
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email: tempEmail,
           email_confirm: true,
@@ -154,31 +153,31 @@ const handler = async (req: Request): Promise<Response> => {
             verified_via_sms: true
           }
         });
-        
+
         if (authError) {
           console.error('User creation error:', authError);
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Failed to create account: " + authError.message 
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Failed to create account: " + authError.message
           }), {
             status: 400,
             headers: corsHeaders,
           });
         }
-        
+
         if (!authData?.user?.id) {
           console.error('User creation returned no user data');
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Account creation failed - no user data returned" 
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Account creation failed - no user data returned"
           }), {
             status: 500,
             headers: corsHeaders,
           });
         }
-        
+
         console.log('User created successfully:', authData.user.id);
-        
+
         // Generate session tokens for the new user
         const { data: tokenData, error: tokenError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
@@ -187,9 +186,9 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (tokenError) {
           console.error('Token generation error:', tokenError);
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Account created but failed to generate tokens: " + tokenError.message 
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Account created but failed to generate tokens: " + tokenError.message
           }), {
             status: 500,
             headers: corsHeaders,
@@ -200,11 +199,11 @@ const handler = async (req: Request): Promise<Response> => {
         if (userData?.referral_code && authData?.user?.id) {
           const { error: clientUpdateError } = await supabase
             .from('clients')
-            .update({ 
-              referral_code_used: userData.referral_code.toUpperCase() 
+            .update({
+              referral_code_used: userData.referral_code.toUpperCase()
             })
             .eq('id', authData.user.id);
-            
+
           if (clientUpdateError) {
             console.error('Error storing referral code:', clientUpdateError);
           } else {
@@ -213,7 +212,7 @@ const handler = async (req: Request): Promise<Response> => {
         }
 
         // Return user data with properly formatted session info
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           success: true,
           user: authData.user,
           session: {
@@ -238,9 +237,9 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (err) {
     console.error('Critical error in verify-sms-otp function:', err);
     console.error('Error stack:', err.stack);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: "Internal server error: " + err.message 
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Internal server error: " + err.message
     }), {
       status: 500,
       headers: corsHeaders,
