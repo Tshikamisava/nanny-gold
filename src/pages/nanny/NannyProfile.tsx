@@ -206,7 +206,7 @@ export default function NannyProfile() {
           ) : (
             <div className="flex items-start gap-4">
               <div className="relative">
-                <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-r from-purple-200 to-pink-200 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-r from-fuchsia-200 to-pink-200 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {profile.avatar_url ? (
                     <img 
                       src={profile.avatar_url} 
@@ -214,7 +214,7 @@ export default function NannyProfile() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <User className="w-8 h-8 md:w-12 md:h-12 text-purple-700" />
+                    <User className="w-8 h-8 md:w-12 md:h-12 text-fuchsia-700" />
                   )}
                 </div>
                 <Button 

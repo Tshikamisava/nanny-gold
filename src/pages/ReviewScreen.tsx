@@ -66,13 +66,13 @@ const ReviewScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-amber-50 px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-fuchsia-50 to-amber-50 px-6 py-8">
       <div className="max-w-sm mx-auto">
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center border-2 border-amber-300">
             <Star className="w-10 h-10 text-amber-600" />
           </div>
-          <h1 className="text-2xl font-bold text-purple-900 mb-2">
+          <h1 className="text-2xl font-bold text-fuchsia-900 mb-2">
             Rate Your Experience
           </h1>
           <p className="text-gray-600">
@@ -81,8 +81,8 @@ const ReviewScreen = () => {
         </div>
 
         <Card className="rounded-xl royal-shadow border-amber-200">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-amber-50 rounded-t-xl border-b border-amber-200">
-            <CardTitle className="text-purple-900 text-center">
+          <CardHeader className="bg-gradient-to-r from-fuchsia-50 to-amber-50 rounded-t-xl border-b border-amber-200">
+            <CardTitle className="text-fuchsia-900 text-center">
               How was your experience with {nannyDetails.name}?
             </CardTitle>
           </CardHeader>
@@ -90,7 +90,7 @@ const ReviewScreen = () => {
             {/* Nanny Info */}
             <div className="text-center">
               <div className="text-4xl mb-2">{nannyDetails.photo}</div>
-              <h3 className="font-semibold text-purple-900">{nannyDetails.name}</h3>
+              <h3 className="font-semibold text-fuchsia-900">{nannyDetails.name}</h3>
             </div>
 
             {/* Star Rating */}
@@ -117,7 +117,7 @@ const ReviewScreen = () => {
 
             {/* Comment */}
             <div>
-              <label className="text-sm font-medium text-purple-900 mb-2 block">
+              <label className="text-sm font-medium text-fuchsia-900 mb-2 block">
                 Share your experience (optional)
               </label>
               <Textarea
@@ -132,7 +132,7 @@ const ReviewScreen = () => {
             <Button 
               onClick={handleSubmit}
               disabled={rating === 0}
-              className="w-full bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-700 hover:to-amber-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50 border-2 border-amber-300 shadow-lg"
+              className="w-full bg-gradient-to-r from-fuchsia-600 to-amber-500 hover:from-fuchsia-700 hover:to-amber-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50 border-2 border-amber-300 shadow-lg"
             >
               Submit Review
             </Button>
@@ -142,7 +142,7 @@ const ReviewScreen = () => {
         <Button
           variant="outline"
           onClick={() => navigate('/dashboard')}
-          className="w-full mt-6 border-amber-300 text-purple-700 hover:bg-amber-50 rounded-xl"
+          className="w-full mt-6 border-amber-300 text-fuchsia-700 hover:bg-amber-50 rounded-xl"
         >
           Skip for Now
         </Button>

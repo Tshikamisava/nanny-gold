@@ -244,7 +244,7 @@ const AdminReferralProgram = () => {
   };
 
   const getRoleColor = (role: string) => {
-    return role === 'Nanny' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
+    return role === 'Nanny' ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-blue-100 text-blue-800';
   };
 
   return (

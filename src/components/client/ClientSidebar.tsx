@@ -103,8 +103,8 @@ export function ClientSidebar() {
                         onClick={handleNavClick}
                         className={`flex items-center w-full rounded-lg transition-all ${
                           active 
-                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
-                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                            ? 'bg-gradient-to-r from-fuchsia-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-fuchsia-600 hover:to-orange-400 hover:text-white'
                         }`}
                       >
                         <item.icon className="mr-2 h-4 w-4" />
@@ -132,8 +132,8 @@ export function ClientSidebar() {
                         onClick={handleNavClick}
                         className={`flex items-center w-full rounded-lg transition-all ${
                           active 
-                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
-                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                            ? 'bg-gradient-to-r from-fuchsia-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-fuchsia-600 hover:to-orange-400 hover:text-white'
                         }`}
                       >
                         <item.icon className="mr-2 h-4 w-4" />
@@ -161,8 +161,8 @@ export function ClientSidebar() {
                         onClick={handleNavClick}
                         className={`flex items-center w-full rounded-lg transition-all ${
                           active 
-                            ? 'bg-gradient-to-r from-purple-600 to-orange-400 text-white font-medium shadow-md' 
-                            : 'hover:bg-gradient-to-r hover:from-purple-600 hover:to-orange-400 hover:text-white'
+                            ? 'bg-gradient-to-r from-fuchsia-600 to-orange-400 text-white font-medium shadow-md' 
+                            : 'hover:bg-gradient-to-r hover:from-fuchsia-600 hover:to-orange-400 hover:text-white'
                         }`}
                       >
                         <item.icon className="mr-2 h-4 w-4" />

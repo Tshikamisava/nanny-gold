@@ -23,10 +23,10 @@ export const BookingTypeSelector: React.FC<BookingTypeSelectorProps> = ({
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-purple-900 mb-2">
+        <h3 className="text-lg font-semibold text-fuchsia-900 mb-2">
           Choose Your Booking Type
         </h3>
-        <p className="text-sm text-purple-700">
+        <p className="text-sm text-fuchsia-700">
           Based on your selected date: {desiredDate.toDateString()}
         </p>
       </div>

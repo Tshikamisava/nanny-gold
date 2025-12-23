@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -21,6 +21,12 @@ const EFTPaymentScreen = () => {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Debug: Track proofFile state changes
+  useEffect(() => {
+    console.log('📋 proofFile state changed:', proofFile ? { name: proofFile.name, size: proofFile.size } : null);
+  }, [proofFile]);
 
   // Get data from navigation state
   const bookingId = location.state?.bookingId;
@@ -54,32 +60,67 @@ const EFTPaymentScreen = () => {
 
   const selectedNannyName = nannyName;
   
-  // Calculate total amount with comprehensive fallback chain
-  const totalAmount = (() => {
-    const finalAmount = amount || pricingData?.total || pricingData?.placementFee || 0;
-    console.log('💰 EFT Total Amount Calculation:', {
-      passedAmount: amount,
-      pricingDataTotal: pricingData?.total,
-      pricingDataPlacementFee: pricingData?.placementFee,
-      finalAmount
+  // CRITICAL: Trust the amount passed from PaymentScreen
+  // PaymentScreen calculates this directly from the pricing objects shown on the "Pay R..." button
+  // We should NOT recalculate it here - just use what was passed
+  const initialAmount = useMemo(() => {
+    // Priority 1: Direct amount from PaymentScreen (this is the exact amount from the button)
+    if (amount && amount > 0) {
+      console.log('💰 EFT Amount: Using direct amount from PaymentScreen:', amount);
+      return amount;
+    }
+    
+    // Priority 2: Fallback to pricingData.total (for short-term bookings)
+    if (pricingData?.total && pricingData.total > 0) {
+      console.log('💰 EFT Amount: Using pricingData.total:', pricingData.total);
+      return pricingData.total;
+    }
+    
+    // Priority 3: Fallback to pricingData.placementFee (ONLY for long-term bookings)
+    if (bookingType === 'long_term' && pricingData?.placementFee && pricingData.placementFee > 0) {
+      console.log('💰 EFT Amount: Using pricingData.placementFee:', pricingData.placementFee);
+      return pricingData.placementFee;
+    }
+    
+    // Should never reach here if PaymentScreen is working correctly
+    console.error('⚠️ EFT Amount Resolution Failed:', {
+      locationState: { amount, pricingData, bookingType },
+      breakdown: {
+        directAmount: amount,
+        pricingDataTotal: pricingData?.total,
+        pricingDataPlacementFee: pricingData?.placementFee,
+        bookingType
+      }
     });
-    return finalAmount;
-  })();
-  
+    
+    return 0;
+  }, [amount, pricingData, bookingType]);
+
+  // Use the amount directly from navigation state - no database fallback
+  // This amount comes directly from PaymentScreen's calculatePayableAmount() function
+  // which uses the exact same pricing objects shown on the "Pay R..." button
+  const totalAmount = initialAmount;
+
   const reference = invoiceNumber || user?.email || 'NANNY-' + Date.now();
 
-  // Warning if amount is R0
+  // Warning if amount is R0 - this should never happen if PaymentScreen is working correctly
   useEffect(() => {
     if (totalAmount === 0) {
       console.error('⚠️ WARNING: EFT payment amount is R0!', {
         bookingId,
         invoiceId,
-        amount,
+        amountFromState: amount,
+        pricingData,
         bookingType,
-        pricingData
+        message: 'PaymentScreen should have passed a valid amount. Please check PaymentScreen navigation.'
+      });
+      toast({
+        title: "Payment Amount Error",
+        description: "Unable to determine payment amount. Please go back and try again.",
+        variant: "destructive"
       });
     }
-  }, [totalAmount, bookingId, invoiceId, amount, bookingType, pricingData]);
+  }, [totalAmount, bookingId, invoiceId, amount, bookingType, pricingData, toast]);
 
   const copyToClipboard = async (text: string, field: string) => {
     try {
@@ -100,13 +141,17 @@ const EFTPaymentScreen = () => {
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📁 File input changed', event.target.files);
     const file = event.target.files?.[0];
     if (file) {
+      console.log('📄 File selected:', { name: file.name, type: file.type, size: file.size });
+      
       // Validate file type and size
       const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
       const maxSize = 5 * 1024 * 1024; // 5MB
 
       if (!validTypes.includes(file.type)) {
+        console.warn('⚠️ Invalid file type:', file.type);
         toast({
           title: "Invalid file type",
           description: "Please upload a JPG, PNG, or PDF file",
@@ -116,6 +161,7 @@ const EFTPaymentScreen = () => {
       }
 
       if (file.size > maxSize) {
+        console.warn('⚠️ File too large:', file.size);
         toast({
           title: "File too large",
           description: "Please upload a file smaller than 5MB",
@@ -124,21 +170,32 @@ const EFTPaymentScreen = () => {
         return;
       }
 
+      console.log('✅ File validated, setting proofFile state');
       setProofFile(file);
+      toast({
+        title: "File selected",
+        description: `${file.name} is ready to upload`,
+      });
+    } else {
+      console.warn('⚠️ No file selected');
     }
   };
 
   const uploadProofOfPayment = async () => {
+    console.log('🔵 Upload button clicked', { proofFile: !!proofFile, user: !!user, bookingId, uploading });
+    
     if (!proofFile || !user) {
+      console.warn('⚠️ Missing requirements:', { hasProofFile: !!proofFile, hasUser: !!user });
       toast({
         title: "Missing information",
-        description: "Please select a proof of payment file",
+        description: proofFile ? "Please log in to continue" : "Please select a proof of payment file",
         variant: "destructive"
       });
       return;
     }
 
     if (!bookingId) {
+      console.error('❌ No booking ID found');
       toast({
         title: "Error",
         description: "No booking ID found. Please start over.",
@@ -148,6 +205,7 @@ const EFTPaymentScreen = () => {
     }
 
     try {
+      console.log('🚀 Starting upload process...');
       setUploading(true);
 
       // Upload file to Supabase storage
@@ -213,18 +271,18 @@ const EFTPaymentScreen = () => {
         
         console.log('✅ Fallback update successful - booking marked as pending');
         
-        // Show success message even though edge function failed (fallback worked)
+        // Show booking created notification after proof upload
         toast({
-          title: "Payment Proof Uploaded",
-          description: "Your payment has been submitted for verification. We'll update you within 2 hours.",
+          title: "Booking created",
+          description: "Your booking has been created successfully! We'll verify your payment within 2 hours.",
         });
       } else {
         console.log('✅ Edge function response:', functionData);
         
-        // Show success toast for normal flow
+        // Show booking created notification after proof upload
         toast({
-          title: "Payment Submitted Successfully",
-          description: "Your EFT payment proof has been uploaded and is being processed.",
+          title: "Booking created",
+          description: "Your booking has been created successfully! Your payment proof has been uploaded and is being processed.",
         });
       }
 
@@ -319,10 +377,10 @@ const EFTPaymentScreen = () => {
                 {formatCurrency(totalAmount)}
               </div>
               <div className="text-sm text-muted-foreground">
-                {preferences.durationType === 'long_term' ? 'Placement Fee (Initial Payment)' : 'Total Fee'}
+                {preferences?.durationType === 'long_term' ? 'Placement Fee (Initial Payment)' : 'Total Fee'}
               </div>
               
-              {preferences.durationType === 'long_term' && (
+              {preferences?.durationType === 'long_term' && (
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     This is the initial placement fee to secure your booking. Monthly service charges will begin once your nanny starts work.
@@ -331,7 +389,7 @@ const EFTPaymentScreen = () => {
               )}
               
               {/* Show service breakdown only for short-term bookings */}
-              {preferences.durationType !== 'long_term' && pricingData && (
+              {preferences?.durationType !== 'long_term' && pricingData && (
                 <div className="mt-4 space-y-2 text-left">
                   <div className="text-sm font-medium text-foreground mb-2">Service Breakdown:</div>
                   <div className="flex justify-between text-sm">
@@ -478,13 +536,69 @@ const EFTPaymentScreen = () => {
               <Label htmlFor="proof-upload" className="text-sm font-medium">
                 Select file (JPG, PNG, or PDF, max 5MB)
               </Label>
-              <Input
-                id="proof-upload"
-                type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
-                onChange={handleFileUpload}
-                className="cursor-pointer"
-              />
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  id="proof-upload"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,image/jpg,application/pdf"
+                  onChange={(e) => {
+                    console.log('🔵 File input onChange triggered', {
+                      files: e.target.files,
+                      fileCount: e.target.files?.length,
+                      firstFile: e.target.files?.[0] ? {
+                        name: e.target.files[0].name,
+                        type: e.target.files[0].type,
+                        size: e.target.files[0].size
+                      } : null
+                    });
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFileUpload(e);
+                    } else {
+                      console.warn('⚠️ No files in event');
+                    }
+                  }}
+                  onClick={(e) => {
+                    console.log('🔵 File input clicked');
+                  }}
+                  className="hidden"
+                  disabled={uploading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    console.log('🔵 Browse button clicked, triggering file input');
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={uploading}
+                  className="flex-1"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {proofFile ? 'Change File' : 'Browse Files'}
+                </Button>
+                {proofFile && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      console.log('🔵 Clear file button clicked');
+                      setProofFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    disabled={uploading}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {!proofFile && (
+                <p className="text-xs text-muted-foreground">
+                  Click "Choose File" above to select your proof of payment
+                </p>
+              )}
             </div>
 
             {proofFile && (
@@ -510,14 +624,24 @@ const EFTPaymentScreen = () => {
             </div>
 
             <Button 
-              onClick={uploadProofOfPayment}
-              disabled={!proofFile || uploading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 Button onClick fired');
+                uploadProofOfPayment();
+              }}
+              disabled={!proofFile || uploading || !bookingId}
+              className="w-full bg-gradient-to-r from-blue-600 to-fuchsia-600 hover:from-blue-700 hover:to-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? (
                 <>
                   <Clock className="w-4 h-4 mr-2 animate-spin" />
                   Uploading...
+                </>
+              ) : !proofFile ? (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Select a file first
                 </>
               ) : (
                 <>

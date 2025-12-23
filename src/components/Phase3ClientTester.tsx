@@ -764,7 +764,7 @@ export default function Phase3ClientTester() {
         <Card>
           <CardContent className="flex items-center justify-center p-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600">{stats.total}</div>
+              <div className="text-3xl font-bold text-fuchsia-600">{stats.total}</div>
               <div className="text-sm text-gray-600">Total Tests</div>
             </div>
           </CardContent>
@@ -788,7 +788,7 @@ export default function Phase3ClientTester() {
       <Button 
         onClick={runAllTests} 
         disabled={isRunning}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+        className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
         size="lg"
       >
         {isRunning ? 'Running Tests...' : 'Run All Tests'}

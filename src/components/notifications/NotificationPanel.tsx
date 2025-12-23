@@ -56,7 +56,7 @@ export default function NotificationPanel() {
         return <Receipt className="h-5 w-5 text-green-500" />;
       case 'message':
       case 'new_message':
-        return <MessageSquare className="h-5 w-5 text-purple-500" />;
+        return <MessageSquare className="h-5 w-5 text-fuchsia-500" />;
       case 'admin_alert':
       case 'warning':
         return <AlertCircle className="h-5 w-5 text-orange-500" />;

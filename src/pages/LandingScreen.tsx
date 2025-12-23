@@ -10,13 +10,13 @@ const LandingScreen = () => {
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="text-center space-y-6">
           <h1 className="text-4xl font-bold">
-            <span className="text-purple-600">Nanny</span>
+            <span className="text-fuchsia-600">Nanny</span>
             <span className="gold-shimmer">Gold</span>
           </h1>
           <p className="text-gray-600 text-lg">Premium child and home care at your fingertips</p>
 
           <div className="space-y-4 w-full max-w-sm">
-            <Button onClick={() => navigate('/enhanced-signup')} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
+            <Button onClick={() => navigate('/enhanced-signup')} className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white py-3">
               Get Started
             </Button>
 

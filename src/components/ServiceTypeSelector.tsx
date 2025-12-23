@@ -53,10 +53,10 @@ export const ServiceTypeSelector: React.FC<ServiceTypeSelectorProps> = ({
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-purple-900 mb-2">
+        <h3 className="text-lg font-semibold text-fuchsia-900 mb-2">
           Choose Your Service Type
         </h3>
-        <p className="text-sm text-purple-700">
+        <p className="text-sm text-fuchsia-700">
           Duration: {durationInDays} days ({startDate.toLocaleDateString()} - {endDate.toLocaleDateString()})
         </p>
       </div>

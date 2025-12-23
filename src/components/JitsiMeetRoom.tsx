@@ -500,10 +500,15 @@ const JitsiMeetRoom = ({
           
           <div ref={jitsiContainerRef} className="w-full rounded-lg overflow-hidden" />
           
+<<<<<<< HEAD
+          {/* Enhanced Control Bar */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-fuchsia-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg">
+=======
           {/* Enhanced Control Bar - Mobile Responsive */}
           <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-orange-400/90 backdrop-blur-md rounded-full p-2 flex gap-1 shadow-lg ${
             isMobile ? 'scale-90' : ''
           }`}>
+>>>>>>> 6addbf92c6d9a82827722495cf1b4d9e7bfae51e
             <Button
               size="sm"
               variant="ghost"

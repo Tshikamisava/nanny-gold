@@ -389,7 +389,7 @@ export default function MobileExperienceTester() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Download className="w-5 h-5 text-purple-500" />
+              <Download className="w-5 h-5 text-fuchsia-500" />
               <div>
                 <p className="text-sm font-medium">PWA Status</p>
                 <p className="text-xs text-muted-foreground">

@@ -121,7 +121,53 @@ const PageLoader = () => (
   </div>
 );
 
+const prefetchTargets = [
+  () => import("./pages/MatchResults"),
+  () => import("./pages/PaymentScreen"),
+  () => import("./pages/EFTPaymentScreen"),
+  () => import("./pages/ServicePrompt"),
+  () => import("./pages/ShortTermBooking"),
+];
+
 const App = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    initializeDataPreloading(queryClient);
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    type IdleHandle = number;
+    const scheduleIdle = (callback: () => void): IdleHandle => {
+      if ("requestIdleCallback" in window && typeof window.requestIdleCallback === "function") {
+        return window.requestIdleCallback(() => callback()) as unknown as IdleHandle;
+      }
+      return window.setTimeout(callback, 2000);
+    };
+
+    const cancelIdle = (handle: IdleHandle) => {
+      if ("cancelIdleCallback" in window && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(handle as unknown as number);
+      } else {
+        clearTimeout(handle);
+      }
+    };
+
+    const handle = scheduleIdle(() => {
+      prefetchTargets.forEach(prefetch => {
+        prefetch().catch(() => {
+          // Best-effort prefetch – ignore failures
+        });
+      });
+    });
+
+    return () => {
+      cancelIdle(handle);
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <TooltipProvider>

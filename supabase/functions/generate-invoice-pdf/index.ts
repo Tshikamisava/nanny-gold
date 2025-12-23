@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     // Header with branding - NannyGold style
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    // Purple "Nanny" (hsl(271 78% 56%) = rgb(139, 92, 246))
+    // Fuchsia Pink "Nanny" (hsl(330 78% 56%) = rgb(217, 70, 239))
     doc.setTextColor(139, 92, 246)
     doc.text('Nanny', 20, 20)
     // Gold "Gold" (hsl(38 94% 50%) = rgb(245, 158, 11))

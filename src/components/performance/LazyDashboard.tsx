@@ -47,7 +47,7 @@ const AdminOverviewSkeleton = () => (
 );
 
 const DashboardSkeleton = () => (
-  <div className="min-h-screen bg-gradient-to-br from-purple-50 to-yellow-50">
+  <div className="min-h-screen bg-gradient-to-br from-fuchsia-50 to-yellow-50">
     <div className="max-w-sm mx-auto">
       <div className="royal-gradient text-white p-6 rounded-b-3xl">
         <div className="flex items-center justify-between mb-4">

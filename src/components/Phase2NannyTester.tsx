@@ -331,8 +331,8 @@ export default function Phase2NannyTester() {
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-full bg-purple-100">
-              <User className="w-8 h-8 text-purple-600" />
+            <div className="p-3 rounded-full bg-fuchsia-100">
+              <User className="w-8 h-8 text-fuchsia-600" />
             </div>
             <div>
               <CardTitle className="text-2xl">Phase 2: Nanny Tenant Testing</CardTitle>

@@ -428,7 +428,7 @@ export default function AdminBookingManagement() {
               </div>
               <div className="flex justify-between">
                 <span>Commission:</span>
-                <span className="text-purple-600 font-medium">{formatCurrency(totalCommission)}</span>
+                <span className="text-fuchsia-600 font-medium">{formatCurrency(totalCommission)}</span>
               </div>
             </div>
           </CardContent>
@@ -645,8 +645,8 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
           <div key={booking.id} className="p-4 border rounded-lg hover:bg-gray-50">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-fuchsia-100 to-pink-100 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-fuchsia-600" />
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">{clientName}</h4>

@@ -98,7 +98,7 @@ export const BookingRevenueDisplay: React.FC<BookingRevenueDisplayProps> = ({
 
   return (
     <Card className="border-2">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
+      <CardHeader className="bg-gradient-to-r from-blue-50 to-fuchsia-50">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5" />
@@ -290,7 +290,7 @@ export const BookingRevenueDisplay: React.FC<BookingRevenueDisplayProps> = ({
         {userRole === 'admin' && (
           <>
             <div className="space-y-3">
-              <h3 className="font-semibold text-lg flex items-center gap-2 text-purple-600">
+              <h3 className="font-semibold text-lg flex items-center gap-2 text-fuchsia-600">
                 Platform Revenue
               </h3>
               
@@ -316,15 +316,15 @@ export const BookingRevenueDisplay: React.FC<BookingRevenueDisplayProps> = ({
                     </div>
                   )}
                   
-                  <div className="flex justify-between text-sm bg-purple-50 p-2 rounded">
-                    <span className="font-medium text-purple-900">Monthly Commission ({effectiveCommissionPercent}%):</span>
-                    <span className="font-bold text-purple-900">R{calculatedCommission.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm bg-fuchsia-50 p-2 rounded">
+                    <span className="font-medium text-fuchsia-900">Monthly Commission ({effectiveCommissionPercent}%):</span>
+                    <span className="font-bold text-fuchsia-900">R{calculatedCommission.toFixed(2)}</span>
                   </div>
                   
                   <Separator />
                   
                   <div className="space-y-2">
-                    <div className="flex justify-between font-bold text-lg text-purple-600">
+                    <div className="flex justify-between font-bold text-lg text-fuchsia-600">
                       <span>Total Admin Revenue (First Month):</span>
                       <span>R{calculatedAdminRevenue.toFixed(2)}</span>
                     </div>
@@ -350,14 +350,14 @@ export const BookingRevenueDisplay: React.FC<BookingRevenueDisplayProps> = ({
                     <span className="font-medium">R{totalCost.toFixed(2)}</span>
                   </div>
                   
-                  <div className="flex justify-between text-sm bg-purple-50 p-2 rounded">
-                    <span className="font-medium text-purple-900">Platform Commission ({effectiveCommissionPercent}%):</span>
-                    <span className="font-bold text-purple-900">R{calculatedCommission.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm bg-fuchsia-50 p-2 rounded">
+                    <span className="font-medium text-fuchsia-900">Platform Commission ({effectiveCommissionPercent}%):</span>
+                    <span className="font-bold text-fuchsia-900">R{calculatedCommission.toFixed(2)}</span>
                   </div>
                   
                   <Separator />
                   
-                  <div className="flex justify-between font-bold text-lg text-purple-600">
+                  <div className="flex justify-between font-bold text-lg text-fuchsia-600">
                     <span>Total Admin Revenue:</span>
                     <span>R{calculatedAdminRevenue.toFixed(2)}</span>
                   </div>
@@ -372,7 +372,7 @@ export const BookingRevenueDisplay: React.FC<BookingRevenueDisplayProps> = ({
               )}
             </div>
             
-            <div className="bg-purple-50 p-3 rounded-lg text-xs text-purple-900">
+            <div className="bg-fuchsia-50 p-3 rounded-lg text-xs text-fuchsia-900">
               <p className="font-medium mb-1">📊 Revenue Split:</p>
               <p>• {getCommissionTierInfo()}</p>
               {effectivePlacementFee > 0 && <p>• Placement fee: {getPlacementFeeInfo()}</p>}
