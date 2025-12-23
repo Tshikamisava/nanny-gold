@@ -1,14 +1,15 @@
-import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_PRICING } from '@/constants/servicePricing';
 
 export interface HourlyPricingResult {
-  baseHourlyRate: number;
-  services: Array<{ name: string; hourlyRate: number; totalCost: number }>;
+  baseRate: number;
+  addOns: Array<{ name: string; price: number }>;
   subtotal: number;
   serviceFee: number;
-  emergencySurcharge?: number;
   total: number;
-  effectiveHourlyRate: number;
+  totalHours?: number;
+  totalDays?: number;
+  hourlyRate?: number; // Effective hourly rate including add-ons
+  breakdown?: string;
 }
 
 export interface LongTermPricingResult {
@@ -16,6 +17,7 @@ export interface LongTermPricingResult {
   addOns: Array<{ name: string; price: number }>;
   total: number;
   placementFee: number;
+  bonusContribution: number;
   monthlyBreakdown: {
     baseService: number;
     addOnServices: number;
@@ -23,38 +25,126 @@ export interface LongTermPricingResult {
   };
 }
 
+// Helper to normalize home size to dictionary keys
+const normalizeHomeSize = (size?: string): "pocket_palace" | "family_hub" | "grand_estate" | "monumental_manor" | "epic_estates" => {
+  if (!size) return 'family_hub';
+  const lower = size.toLowerCase();
+
+  if (['pocket_palace', 'family_hub', 'grand_estate', 'monumental_manor', 'epic_estates'].includes(lower)) {
+    return lower as any;
+  }
+
+  if (lower.includes('pocket') || lower === 'small') return 'pocket_palace';
+  if (lower.includes('family') || lower === 'medium') return 'family_hub';
+  if (lower.includes('grand') && !lower.includes('epic')) return 'grand_estate';
+  if (lower.includes('monumental') || lower === 'extra_large') return 'monumental_manor';
+  if (lower.includes('epic')) return 'epic_estates';
+  return 'family_hub';
+};
+
 export const calculateHourlyPricing = async (
-  bookingType: 'emergency' | 'date_night' | 'date_day' | 'school_holiday',
+  bookingType: 'emergency' | 'date_night' | 'date_day' | 'school_holiday' | 'temporary_support',
   totalHours: number,
   services: {
     cooking?: boolean;
-    specialNeeds?: boolean;
+    specialNeeds?: boolean; // Diverse Ability Support
     drivingSupport?: boolean;
     lightHousekeeping?: boolean;
+    petCare?: boolean;
   },
-  selectedDates?: string[],
+  selectedDates: string[] = [],
   homeSize?: string
 ): Promise<HourlyPricingResult> => {
-  const { data, error } = await supabase.functions.invoke('calculate-hourly-pricing', {
-    body: {
-      bookingType,
-      totalHours,
-      services,
-      selectedDates,
-      homeSize // Pass homeSize to edge function
-    }
-  });
+  // normalizedBookingType removed as unused
 
-  if (error) {
-    console.error('Error calculating hourly pricing:', error);
-    throw new Error('Failed to calculate pricing');
+  // Initialize result
+  let baseRate: number = 0;
+  let serviceFee: number = SERVICE_PRICING.short_term.emergency.service_fee; // Default 35
+  const addOns: Array<{ name: string; price: number }> = [];
+
+  // 1. Calculate Base Rate & Service Fee
+  if (bookingType === 'temporary_support') {
+    // Gap Coverage
+    const weekdayRate = SERVICE_PRICING.short_term.gap_coverage.weekday_rate;
+    const weekendRate = SERVICE_PRICING.short_term.gap_coverage.weekend_rate;
+    let daysTotal = 0;
+
+    selectedDates.forEach(dateStr => {
+      const date = new Date(dateStr);
+      const isWeekend = date.getDay() === 0 || date.getDay() === 5 || date.getDay() === 6; // Fri, Sat, Sun
+      daysTotal += isWeekend ? weekendRate : weekdayRate;
+    });
+    baseRate = daysTotal;
+    serviceFee = SERVICE_PRICING.short_term.gap_coverage.placement_fee; // 2500
+
+  } else if (bookingType === 'emergency') {
+    baseRate = SERVICE_PRICING.short_term.emergency.hourly_rate * Math.max(totalHours, SERVICE_PRICING.short_term.emergency.min_hours);
+    serviceFee = SERVICE_PRICING.short_term.emergency.service_fee;
+
+  } else if (bookingType === 'date_night') {
+    baseRate = SERVICE_PRICING.short_term.date_night.hourly_rate * Math.max(totalHours, SERVICE_PRICING.short_term.date_night.min_hours);
+    serviceFee = SERVICE_PRICING.short_term.date_night.service_fee;
+
+  } else {
+    // day_care, date_day, school_holiday
+    let hourlyWithWeekend: number = SERVICE_PRICING.short_term.day_care.standard_hourly;
+
+    if (selectedDates.length > 0) {
+      const hasWeekend = selectedDates.some(d => {
+        const date = new Date(d);
+        const day = date.getDay();
+        return day === 0 || day === 5 || day === 6;
+      });
+      if (hasWeekend) hourlyWithWeekend = SERVICE_PRICING.short_term.day_care.weekend_hourly;
+    }
+
+    baseRate = hourlyWithWeekend * totalHours;
+    serviceFee = SERVICE_PRICING.short_term.day_care.service_fee;
   }
 
-  return data;
+  // 2. Add-ons
+  // Cooking (Short Term: R100 per day)
+  if (services.cooking && ['emergency', 'date_night', 'date_day', 'school_holiday'].includes(bookingType)) {
+    const days = Math.max(1, selectedDates.length);
+    const cost = SERVICE_PRICING.add_ons.cooking.short_term_daily * days;
+    addOns.push({ name: 'Cooking', price: cost });
+  }
+
+  // Cooking for Gap Coverage
+  if (services.cooking && bookingType === 'temporary_support') {
+    const days = Math.max(1, selectedDates.length);
+    addOns.push({ name: 'Cooking', price: SERVICE_PRICING.add_ons.cooking.short_term_daily * days });
+  }
+
+  // Light Housekeeping
+  if (services.lightHousekeeping) {
+    const sizeKey = normalizeHomeSize(homeSize);
+    const dailyRate = SERVICE_PRICING.add_ons.light_housekeeping[sizeKey];
+    const days = Math.max(1, selectedDates.length);
+    const cost = dailyRate * days;
+    addOns.push({ name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`, price: cost });
+  }
+
+  if (services.specialNeeds) {
+    addOns.push({ name: 'Diverse Ability Support', price: 0 });
+  }
+
+  const addOnsTotal = addOns.reduce((sum, item) => sum + item.price, 0);
+
+  return {
+    baseRate,
+    addOns,
+    subtotal: baseRate + addOnsTotal,
+    serviceFee,
+    total: baseRate + addOnsTotal + serviceFee,
+    totalHours,
+    totalDays: selectedDates.length,
+    hourlyRate: totalHours ? (baseRate / totalHours) : 0
+  };
 };
 
 export const calculateLongTermPricing = (
-  homeSize: string = 'medium',
+  homeSize: string = 'family_hub',
   livingArrangement: string = 'live_out',
   childrenAges: string[] = [],
   otherDependents: number = 0,
@@ -62,151 +152,80 @@ export const calculateLongTermPricing = (
     cooking?: boolean;
     specialNeeds?: boolean;
     drivingSupport?: boolean;
-    ecdTraining?: boolean;
-    montessori?: boolean;
     backupNanny?: boolean;
-    drivingRequired?: boolean;
   } = {}
 ): LongTermPricingResult => {
-  // Updated base rates by home size - NEW PRICING STRUCTURE
-  const homeSizeRates: { [key: string]: { live_in: number; live_out: number } } = {
-    'pocket_palace': { live_in: 4500, live_out: 4800 },        // <120m2, cosy 2 bedrooms
-    'family_hub': { live_in: 6000, live_out: 6800 },           // 120-250m2, comfortable 3-4 bedrooms
-    'grand_estate': { live_in: 7000, live_out: 7800 },         // 251-300m2, spacious 3-4 oversized bedrooms
-    'monumental_manor': { live_in: 8000, live_out: 9000 },     // 301-360m2, luxurious 5+ oversized bedrooms
-    'epic_estates': { live_in: 10000, live_out: 11000 }        // 361m2+, grand luxury living
-  };
+  const sizeKey = normalizeHomeSize(homeSize);
+  // Handle 'live-in', 'live_in', 'live-out', 'live_out'
+  const arrangementClean = livingArrangement.toLowerCase().replace('-', '_');
+  const isLiveIn = arrangementClean === 'live_in';
 
-  // Map legacy database values to proper constants
-  const homeSizeMapping: { [key: string]: string } = {
-    'small': 'pocket_palace',
-    'medium': 'family_hub', 
-    'large': 'grand_estate',
-    'extra_large': 'monumental_manor',
-    // Keep existing proper keys
-    'pocket_palace': 'pocket_palace',
-    'family_hub': 'family_hub',
-    'grand_estate': 'grand_estate',
-    'monumental_manor': 'monumental_manor',
-    'epic_estates': 'epic_estates'
-  };
+  const baseRate = isLiveIn
+    ? SERVICE_PRICING.long_term.base_rates[sizeKey]?.live_in || SERVICE_PRICING.long_term.base_rates.family_hub.live_in
+    : SERVICE_PRICING.long_term.base_rates[sizeKey]?.live_out || SERVICE_PRICING.long_term.base_rates.family_hub.live_out;
 
-  const mappedHomeSize = homeSizeMapping[homeSize] || 'family_hub';
-  
-  // Normalize living arrangement format (handle both 'live-in' and 'live_in')
-  // Phase 1: Add null safety to prevent crash when livingArrangement is null
-  const normalizedArrangement = (livingArrangement || 'live_out').replace(/-/g, '_').toLowerCase();
-  
-  console.log(`💰 Calculating long-term pricing: ${homeSize} -> ${mappedHomeSize} (${livingArrangement})`);
-  console.log(`📊 Base rates for ${mappedHomeSize}:`, homeSizeRates[mappedHomeSize]);
-  console.log(`🔧 Normalized arrangement: ${livingArrangement} -> ${normalizedArrangement}`);
-
-  const homeSizeData = homeSizeRates[mappedHomeSize];
-  let baseRate = normalizedArrangement === 'live_in' ? homeSizeData.live_in : homeSizeData.live_out;
-  
-  console.log(`✅ Selected base rate: R${baseRate} for ${normalizedArrangement}`);
-
-  // Count children (18 years and under)
-  const countChildren = (ages: string[]): number => {
-    return ages.filter(age => {
-      const numericAge = parseFloat(age.match(/\d+(\.\d+)?/)?.[0] || '0');
-      if (age.toLowerCase().includes('month')) {
-        return numericAge <= 216; // 18 years = 216 months
-      } else if (age.toLowerCase().includes('year')) {
-        return numericAge <= 18;
-      } else {
-        return numericAge <= 18; // Assume years if no unit specified
-      }
-    }).length;
-  };
-
-  const numChildren = countChildren(childrenAges);
-  
-  // Add R500 per child after the 3rd child
-  if (numChildren > 3) {
-    const extraChildren = numChildren - 3;
-    baseRate += extraChildren * 500;
-  }
-  
-  // Add R500 if more than 2 other dependents
-  if (otherDependents > 2) {
-    baseRate += 500;
-  }
-
-  // Service add-ons
   const addOns: Array<{ name: string; price: number }> = [];
 
-  if (services.cooking) {
-    addOns.push({ name: SERVICE_PRICING.cooking.name, price: SERVICE_PRICING.cooking.price });
-    console.log(`✅ Added cooking support: R${SERVICE_PRICING.cooking.price}/month`);
+  if (childrenAges.length > SERVICE_PRICING.add_ons.child_surcharge.threshold) {
+    const extra = childrenAges.length - SERVICE_PRICING.add_ons.child_surcharge.threshold;
+    addOns.push({
+      name: `Additional Children (${extra})`,
+      price: extra * SERVICE_PRICING.add_ons.child_surcharge.amount
+    });
+  }
+
+  if (otherDependents > SERVICE_PRICING.add_ons.adult_occupant_surcharge.threshold) {
+    const extra = otherDependents - SERVICE_PRICING.add_ons.adult_occupant_surcharge.threshold;
+    addOns.push({
+      name: `Additional Occupants (${extra})`,
+      price: extra * SERVICE_PRICING.add_ons.adult_occupant_surcharge.amount
+    });
   }
 
   if (services.specialNeeds) {
-    addOns.push({ name: SERVICE_PRICING.special_needs.name, price: SERVICE_PRICING.special_needs.price });
-    console.log(`✅ Added diverse ability support: R${SERVICE_PRICING.special_needs.price}/month`);
+    addOns.push({
+      name: 'Diverse Ability Support',
+      price: SERVICE_PRICING.add_ons.diverse_ability.long_term_monthly
+    });
+  }
+
+  if (services.cooking) {
+    if (sizeKey === 'monumental_manor' || sizeKey === 'epic_estates') {
+      addOns.push({ name: 'Cooking (Included)', price: 0 });
+    } else {
+      addOns.push({ name: 'Cooking', price: SERVICE_PRICING.add_ons.cooking.long_term_monthly });
+    }
   }
 
   if (services.drivingSupport) {
-    addOns.push({ name: SERVICE_PRICING.driving_support.name, price: SERVICE_PRICING.driving_support.price });
-    console.log(`✅ Added driving support: R${SERVICE_PRICING.driving_support.price}/month`);
-  }
-
-  if (services.ecdTraining) {
-    addOns.push({ name: SERVICE_PRICING.ecd_training.name, price: SERVICE_PRICING.ecd_training.price });
-  }
-
-  if (services.montessori) {
-    addOns.push({ name: SERVICE_PRICING.montessori.name, price: SERVICE_PRICING.montessori.price });
-  }
-
-  if (services.backupNanny) {
-    addOns.push({ name: SERVICE_PRICING.backup_nanny.name, price: SERVICE_PRICING.backup_nanny.price });
-  }
-
-  if (services.drivingRequired) {
-    addOns.push({ name: "Transportation Service", price: 2000 });
-  }
-
-  // Updated placement fees based on new requirements
-  const placementFees = {
-    'pocket_palace': 2500,      // Standard homes
-    'family_hub': 2500,         // Standard homes
-    'grand_estate': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5), // Premium homes: 50% of monthly rate
-    'monumental_manor': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5), // Premium homes: 50% of monthly rate
-    'epic_estates': (homeSize: string, baseRate: number) => Math.round(baseRate * 0.5)   // Premium homes: 50% of monthly rate
-  };
-
-  const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0);
-  const total = baseRate + addOnTotal;
-  
-  // Calculate placement fee based on home size (UPDATED - include monumental_manor as premium)
-  const calculatePlacementFee = (homeSize: string, baseRateOnly: number): number => {
-    const mappedSize = homeSize?.toLowerCase().replace(/[- ]/g, '_');
-    
-    // Flat R2,500 for standard homes
-    if (['pocket_palace', 'family_hub'].includes(mappedSize)) {
-      return 2500;
+    if (sizeKey === 'monumental_manor' || sizeKey === 'epic_estates') {
+      addOns.push({ name: 'Driving (Included)', price: 0 });
+    } else {
+      addOns.push({ name: 'Driving', price: SERVICE_PRICING.add_ons.driving.long_term_monthly });
     }
-    
-    // 50% for premium estates only (grand_estate, monumental_manor, epic_estates)
-    if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(mappedSize)) {
-      return Math.round(baseRateOnly * 0.5);
-    }
-    
-    return 2500;
-  };
-  
-  const placementFee = calculatePlacementFee(mappedHomeSize, baseRate); // Pass baseRate, not total
+  }
+
+  const addOnsTotal = addOns.reduce((sum, item) => sum + item.price, 0);
+  const totalMonthly = baseRate + addOnsTotal;
+
+  let placementFee = SERVICE_PRICING.long_term.placement_fee.standard;
+  if (['grand_estate', 'monumental_manor', 'epic_estates'].includes(sizeKey)) {
+    placementFee = totalMonthly * SERVICE_PRICING.long_term.placement_fee.premium_percentage;
+  }
+
+  // Annual Bonus: Client contribution (5% of Nanny's monthly income/rate)
+  const bonusContribution = totalMonthly * 0.05;
 
   return {
     baseRate,
     addOns,
-    total,
+    total: totalMonthly,
     placementFee,
+    bonusContribution,
     monthlyBreakdown: {
       baseService: baseRate,
-      addOnServices: addOnTotal,
-      totalMonthly: total
+      addOnServices: addOnsTotal,
+      totalMonthly
     }
   };
 };
@@ -220,173 +239,59 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+export const validateTemporarySupportDates = (selectedDates: string[]): boolean => {
+  return selectedDates && selectedDates.length >= SERVICE_PRICING.short_term.gap_coverage.min_days;
+};
+
+export const calculateBookingDuration = (startDate: string, endDate?: string): number => {
+  if (!endDate) return 1;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays + 1);
+};
+
+// Compatibility for existing calls
 export const getBookingTypeRate = (
-  bookingType: string, 
-  homeSize?: string, 
-  selectedDates?: string[], 
+  bookingType: string,
+  homeSize?: string,
+  selectedDates?: string[],
   livingArrangement?: string,
   childrenAges?: string[],
   otherDependents?: number,
-  services?: {
-    cooking?: boolean;
-    specialNeeds?: boolean;
-    drivingSupport?: boolean;
-    ecdTraining?: boolean;
-    montessori?: boolean;
-    backupNanny?: boolean;
-  }
+  services?: any
 ): { base: number; description: string } => {
-  // For temporary support (Gap Coverage), check for weekend rates
-  if (bookingType === 'temporary_support') {
-    let total = 0;
-    let weekdayCount = 0;
-    let weekendCount = 0;
-    
-    selectedDates?.forEach((dateStr: string) => {
-      const date = new Date(dateStr);
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-      
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        // Weekend rate
-        total += 350;
-        weekendCount++;
-      } else {
-        // Weekday rate  
-        total += 280;
-        weekdayCount++;
-      }
-    });
-    
-    const description = `${weekdayCount} weekdays (R280/day) + ${weekendCount} weekends (R350/day)`;
-    return { base: total, description };
-  }
+  // Suppress unused vars check by using them or ignoring
+  void selectedDates;
+  void childrenAges;
+  void otherDependents;
+  void services;
 
-  // PHASE 1: Defensive check - prevent calling long-term pricing for short-term bookings
-  const shortTermTypes = ['emergency', 'date_night', 'date_day', 'school_holiday', 'temporary_support', 'standard'];
-  if (shortTermTypes.includes(bookingType) && !livingArrangement) {
-    // This is a short-term booking, return default hourly rate
-    const hourlyRates: { [key: string]: number } = {
-      'emergency': 80,
-      'date_night': 120,
-      'date_day': 40,
-      'school_holiday': 130,
-      'standard': 120
-    };
-    const rate = hourlyRates[bookingType] || 120;
-    return { base: rate, description: `R${rate}/hour` };
-  }
-
-  // Long-term booking rates
   if (bookingType === 'long_term') {
-    const pricing = calculateLongTermPricing(
-      homeSize, 
-      livingArrangement, 
-      childrenAges || [], 
-      otherDependents || 0, 
-      services || {}
-    );
+    const pricing = calculateLongTermPricing(homeSize, livingArrangement, childrenAges, otherDependents, services);
     return { base: pricing.baseRate, description: `Base: R${pricing.baseRate}/month` };
   }
 
-  // Default hourly rates for short-term bookings
-  const hourlyRates: { [key: string]: number } = {
-    'emergency': 80,
-    'date_night': 120,
-    'date_day': 40,
-    'school_holiday': 130
-  };
+  if (bookingType === 'temporary_support') {
+    // Weekday R280/Day, Weekend R350/Day
+    // Just return weekday rate as base representation
+    return { base: 280, description: 'From R280/day' };
+  }
 
-  const rate = hourlyRates[bookingType] || 120;
-  return { base: rate, description: `R${rate}/hour` };
+  // Short Term
+  if (bookingType === 'emergency') return { base: 80, description: 'R80/hour' };
+  if (bookingType === 'date_night') return { base: 120, description: 'R120/hour' };
+  if (['date_day', 'day_care', 'school_holiday'].includes(bookingType)) return { base: 40, description: 'From R40/hour' };
+
+  return { base: 0, description: 'Custom' };
 };
 
+// Deprecated or Unused identifiers
 export const isHourlyBasedBooking = (bookingType: string): boolean => {
   return ['emergency', 'date_night', 'date_day', 'school_holiday'].includes(bookingType);
 };
 
 export const isDailyBasedBooking = (bookingType: string): boolean => {
   return ['temporary_support'].includes(bookingType);
-};
-
-export const validateTemporarySupportDates = (selectedDates: string[]): boolean => {
-  return selectedDates && selectedDates.length >= 5; // Minimum 5 consecutive days for Gap Coverage
-};
-
-export const calculateDailyPricing = (
-  selectedDates: string[],
-  bookingType: string,
-  homeSize?: string,
-  services: {
-    cooking?: boolean;
-    specialNeeds?: boolean;
-    drivingSupport?: boolean;
-    lightHousekeeping?: boolean;
-  } = {}
-) => {
-  if (bookingType !== 'temporary_support') {
-    return { total: 0, breakdown: [] };
-  }
-
-  let total = 0;
-  const breakdown: Array<{ date: string; rate: number; isWeekend: boolean }> = [];
-
-  selectedDates.forEach((dateStr: string) => {
-    const date = new Date(dateStr);
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 5 = Friday, 6 = Saturday
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Include Friday as weekend
-    const rate = isWeekend ? 350 : 280; // R350 weekend, R280 weekday
-    
-    total += rate;
-    breakdown.push({
-      date: dateStr,
-      rate,
-      isWeekend
-    });
-  });
-
-  // Add service costs for each day - updated rates
-  const dailyServiceCost = 
-    (services.cooking ? 100 : 0) + // R100/day flat rate for all short-term services
-    (services.specialNeeds ? 0 : 0) + // R0 additional for diverse ability support
-    (services.drivingSupport ? 0 : 0); // Driving support not applicable for Gap Coverage
-
-  // Light Housekeeping based on home size (daily rates)
-  if (services.lightHousekeeping && homeSize) {
-    let dailyHousekeepingRate = 100; // Default for family_hub
-    
-    switch (homeSize) {
-      case 'pocket_palace':
-        dailyHousekeepingRate = 80;
-        break;
-      case 'family_hub':
-        dailyHousekeepingRate = 100;
-        break;
-      case 'grand_retreat':
-        dailyHousekeepingRate = 120;
-        break;
-      case 'epic_estates':
-        dailyHousekeepingRate = 300;
-        break;
-    }
-    
-    total += dailyHousekeepingRate * selectedDates.length;
-  }
-
-  if (dailyServiceCost > 0) {
-    total += dailyServiceCost * selectedDates.length;
-  }
-
-  // No service fee for Gap Coverage (waived per requirements)
-  return { total, breakdown };
-};
-
-export const calculateBookingDuration = (startDate: string, endDate?: string): number => {
-  if (!endDate) return 1;
-  
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return Math.max(1, diffDays + 1); // Include both start and end dates
 };

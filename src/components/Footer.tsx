@@ -11,9 +11,9 @@ export const Footer = () => {
           {/* Brand */}
           <div className="flex items-center space-x-2">
             <Heart className="h-6 w-6 text-primary fill-primary" />
-            <h3 className="text-xl font-bold">
-              <span className="text-primary">Nanny</span>
-              <span className="gold-shimmer">Gold</span>
+            <h3 className="text-3xl font-bold" style={{ fontFamily: 'Dancing Script, cursive' }}>
+              <span style={{ color: '#d61784' }}>Nanny</span>
+              <span style={{ color: '#d4af37' }}>Gold</span>
             </h3>
           </div>
 

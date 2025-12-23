@@ -260,6 +260,34 @@ Deno.serve(async (req) => {
 
     console.log('✅ Invoice tracking updated')
 
+    // Send admin notification for successful invoice send
+    if (delivery_method === 'email' || delivery_method === 'both') {
+      const { data: admins } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+
+      if (admins && admins.length > 0) {
+        await supabase.from('notifications').insert(
+          admins.map(admin => ({
+            user_id: admin.user_id,
+            title: 'Invoice Sent Successfully',
+            message: `Invoice ${invoice.invoice_number} for R${invoice.amount.toFixed(2)} sent to ${clientName} (${clientEmail}) via ${delivery_method}`,
+            type: 'admin_alert',
+            data: {
+              invoice_id: invoice.id,
+              invoice_number: invoice.invoice_number,
+              client_name: clientName,
+              client_email: clientEmail,
+              amount: invoice.amount,
+              delivery_method
+            }
+          }))
+        )
+        console.log('✅ Admin notifications sent for successful invoice delivery')
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

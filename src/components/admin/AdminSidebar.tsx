@@ -40,6 +40,7 @@ const menuItems = [
   { title: 'Booking Calendar', url: '/admin/booking-calendar', icon: CalendarDays, permission: 'bookings' },
   { title: 'Referral Program', url: '/admin/referral-program', icon: Gift, permission: 'user_management' },
   { title: 'Invoicing & Rewards', url: '/admin/invoicing-rewards', icon: Receipt, permission: 'payments' },
+  { title: 'Invoice Management', url: '/admin/invoice-management', icon: Receipt, permission: 'payments' },
   { title: 'Professional Development', url: '/admin/professional-development', icon: GraduationCap, permission: 'professional_development' },
   { title: 'Support & Disputes', url: '/admin/support', icon: MessageSquare, permission: 'support' },
   { title: 'Onboarding & Verification', url: '/admin/verification', icon: CheckCircle, permission: 'verification' },

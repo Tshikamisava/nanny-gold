@@ -126,6 +126,30 @@ export const useCreateInterview = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-interviews'] });
+      
+      // Send admin notification for new interview
+      supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .then(({ data: admins }) => {
+          if (admins && admins.length > 0) {
+            supabase.from('notifications').insert(
+              admins.map(admin => ({
+                user_id: admin.user_id,
+                title: 'New Interview Scheduled',
+                message: `Interview scheduled for ${data.interview_date} at ${data.interview_time}`,
+                type: 'admin_alert',
+                data: {
+                  interview_id: data.id,
+                  action: 'interview_scheduled'
+                }
+              }))
+            );
+          }
+        });
+      
       toast({
         title: "Interview Scheduled",
         description: `Interview has been scheduled successfully.`
@@ -166,6 +190,30 @@ export const useUpdateInterview = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-interviews'] });
+      
+      // Send admin notification for interview update
+      supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .then(({ data: admins }) => {
+          if (admins && admins.length > 0) {
+            supabase.from('notifications').insert(
+              admins.map(admin => ({
+                user_id: admin.user_id,
+                title: 'Interview Updated',
+                message: `Interview has been updated successfully`,
+                type: 'admin_alert',
+                data: {
+                  interview_id: updates.id,
+                  action: 'interview_updated'
+                }
+              }))
+            );
+          }
+        });
+      
       toast({
         title: "Interview Updated",
         description: "Interview has been updated successfully."
@@ -189,17 +237,20 @@ export const useCancelInterview = () => {
   return useMutation({
     mutationFn: async ({ 
       id, 
-      cancellation_reason 
+      cancellation_reason,
+      cancelled_by 
     }: { 
       id: string; 
       cancellation_reason: string;
+      cancelled_by: string;
     }) => {
       const { data, error } = await supabase
         .from('interviews')
         .update({
           status: 'cancelled',
-          cancelled_by: (await supabase.auth.getUser()).data.user?.id,
-          cancellation_reason
+          cancellation_reason,
+          cancelled_by,
+          updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .select()
@@ -208,8 +259,32 @@ export const useCancelInterview = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-interviews'] });
+      
+      // Send admin notification for interview cancellation
+      supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .then(({ data: admins }) => {
+          if (admins && admins.length > 0) {
+            supabase.from('notifications').insert(
+              admins.map(admin => ({
+                user_id: admin.user_id,
+                title: 'Interview Cancelled',
+                message: `Interview has been cancelled. Reason: ${data.cancellation_reason}`,
+                type: 'admin_alert',
+                data: {
+                  interview_id: data.id,
+                  action: 'interview_cancelled'
+                }
+              }))
+            );
+          }
+        });
+      
       toast({
         title: "Interview Cancelled",
         description: "Interview has been cancelled successfully."
@@ -223,5 +298,59 @@ export const useCancelInterview = () => {
         variant: "destructive"
       });
     }
+  });
+};
+
+export const useAdminInterviews = () => {
+  const { user } = useAuthContext();
+  
+  return useQuery({
+    queryKey: ['admin-interviews'],
+    queryFn: async (): Promise<Interview[]> => {
+      if (!user?.id) {
+        return [];
+      }
+      
+      // Check if user is admin
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+      
+      if (!userRole) {
+        // Not an admin, return empty array
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from('interviews')
+        .select(`
+          *,
+          nanny_profiles:nannies!interviews_nanny_id_fkey(
+            profiles!nannies_id_fkey(first_name, last_name, email)
+          ),
+          client_profiles:clients!interviews_client_id_fkey(
+            profiles!clients_id_fkey(first_name, last_name, email)
+          )
+        `)
+        .order('interview_date', { ascending: true });
+      
+      if (error) {
+        console.error('useAdminInterviews - Query error:', error);
+        throw error;
+      }
+      
+      return data.map((interview: any) => ({
+        ...interview,
+        nanny_name: interview.nanny_profiles?.profiles ? 
+          `${interview.nanny_profiles.profiles.first_name || ''} ${interview.nanny_profiles.profiles.last_name || ''}`.trim() : '',
+        nanny_email: interview.nanny_profiles?.profiles?.email || '',
+        client_name: interview.client_profiles?.profiles ? 
+          `${interview.client_profiles.profiles.first_name || ''} ${interview.client_profiles.profiles.last_name || ''}`.trim() : ''
+      })) as Interview[];
+    },
+    enabled: !!user?.id
   });
 };

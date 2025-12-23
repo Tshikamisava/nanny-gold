@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Calendar, 
   Clock, 
@@ -19,26 +20,31 @@ import {
   MessageCircle,
   Plus,
   Edit,
-  UserCheck
+  UserCheck,
+  TrendingUp
 } from 'lucide-react';
-import { useInterviews, useCreateInterview, useUpdateInterview, useCancelInterview } from '@/hooks/useInterviews';
-import { useVerificationWorkflow } from '@/hooks/useVerificationWorkflow';
+import { useAdminInterviews, useCreateInterview, useUpdateInterview, useCancelInterview } from '@/hooks/useInterviews';
+import InterviewCommunication from '@/components/InterviewCommunication';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useVerificationWorkflow } from '@/hooks/useVerificationWorkflow';
 
 const AdminInterviews = () => {
   const { toast } = useToast();
-  const { data: interviews = [], isLoading } = useInterviews();
+  const { data: interviews = [], isLoading } = useAdminInterviews();
   const createInterview = useCreateInterview();
   const updateInterview = useUpdateInterview();
   const cancelInterview = useCancelInterview();
   const { completeInterviewStep } = useVerificationWorkflow();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [selectedInterview, setSelectedInterview] = useState<any>(null);
-  const [interviewResult, setInterviewResult] = useState<'passed' | 'failed' | null>(null);
-  const [resultNotes, setResultNotes] = useState('');
+  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
+  const [rescheduleData, setRescheduleData] = useState({
+    interview_id: '',
+    interview_date: '',
+    interview_time: '10:00',
+    reason: ''
+  });
 
   // Form state for creating interviews
   const [formData, setFormData] = useState({
@@ -49,13 +55,64 @@ const AdminInterviews = () => {
     notes: ''
   });
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+
+  // Nanny search state
+  const [availableNannies, setAvailableNannies] = useState<any[]>([]);
   const [nannySearchTerm, setNannySearchTerm] = useState('');
   const [showNannySuggestions, setShowNannySuggestions] = useState(false);
-  const [availableNannies, setAvailableNannies] = useState<any[]>([]);
+
+  // Dialog and interview state
+  const [selectedInterview, setSelectedInterview] = useState<any>(null);
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [interviewResult, setInterviewResult] = useState<'passed' | 'failed'>('passed');
+  const [resultNotes, setResultNotes] = useState('');
 
   const scheduledInterviews = interviews.filter(i => i.status === 'scheduled');
   const completedInterviews = interviews.filter(i => i.status === 'completed');
   const cancelledInterviews = interviews.filter(i => i.status === 'cancelled');
+
+  // Filter interviews based on search and filters
+  const filterInterviews = (interviewList: any[]) => {
+    return interviewList.filter(interview => {
+      // Search filter
+      const searchMatch = !searchTerm || 
+        interview.nanny_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        interview.nanny_email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      const statusMatch = statusFilter === 'all' || interview.status === statusFilter;
+
+      // Date filter
+      let dateMatch = true;
+      if (dateFilter !== 'all') {
+        const interviewDate = new Date(interview.interview_date);
+        const today = new Date();
+        const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const monthFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        switch (dateFilter) {
+          case 'today':
+            dateMatch = interviewDate.toDateString() === today.toDateString();
+            break;
+          case 'week':
+            dateMatch = interviewDate >= today && interviewDate <= weekFromNow;
+            break;
+          case 'month':
+            dateMatch = interviewDate >= today && interviewDate <= monthFromNow;
+            break;
+        }
+      }
+
+      return searchMatch && statusMatch && dateMatch;
+    });
+  };
+
+  const filteredScheduled = filterInterviews(scheduledInterviews);
+  const filteredCompleted = filterInterviews(completedInterviews);
+  const filteredCancelled = filterInterviews(cancelledInterviews);
 
   // Load available nannies for search
   const loadAvailableNannies = async () => {
@@ -160,39 +217,80 @@ const AdminInterviews = () => {
     }
   };
 
-  const handleCompleteInterview = async () => {
-    if (!selectedInterview || !interviewResult) {
+  const handleRescheduleInterview = async () => {
+    if (!rescheduleData.interview_id || !rescheduleData.interview_date) {
       toast({
         title: "Missing Information",
-        description: "Please select an interview result.",
+        description: "Please fill in all required fields.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      // Update interview status
       await updateInterview.mutateAsync({
-        id: selectedInterview.id,
+        id: rescheduleData.interview_id,
         updates: { 
-          status: 'completed',
-          notes: `${selectedInterview.notes || ''}\n\nInterview Result: ${interviewResult.toUpperCase()}\nNotes: ${resultNotes}`
+          interview_date: rescheduleData.interview_date,
+          interview_time: rescheduleData.interview_time,
+          notes: `${selectedInterview?.notes || ''}\n\nRescheduled: ${rescheduleData.reason || 'Admin rescheduled interview'}`
         }
       });
 
-      // Update verification workflow
-      if (interviewResult === 'passed') {
-        await completeInterviewStep(selectedInterview.nanny_id, true, resultNotes);
-      } else {
-        await completeInterviewStep(selectedInterview.nanny_id, false, resultNotes);
-      }
+      setIsRescheduleDialogOpen(false);
+      setSelectedInterview(null);
+      setRescheduleData({
+        interview_id: '',
+        interview_date: '',
+        interview_time: '10:00',
+        reason: ''
+      });
+    } catch (error) {
+      console.error('Failed to reschedule interview:', error);
+    }
+  };
+
+  const handleCompleteInterview = async () => {
+    if (!selectedInterview) {
+      toast({
+        title: "Error",
+        description: "No interview selected.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const resultText = interviewResult === 'passed' ? 'PASSED' : 'FAILED';
+      const updatedNotes = `${selectedInterview.notes || ''}\n\nInterview Result: ${resultText}\n${resultNotes || 'No additional notes.'}`.trim();
+
+      await updateInterview.mutateAsync({
+        id: selectedInterview.id,
+        updates: {
+          status: 'completed',
+          notes: updatedNotes
+        }
+      });
+
+      // Complete the interview step in verification workflow
+      await completeInterviewStep(selectedInterview.nanny_id, interviewResult);
 
       setIsCompleteDialogOpen(false);
       setSelectedInterview(null);
-      setInterviewResult(null);
+      setInterviewResult('passed');
       setResultNotes('');
+
+      toast({
+        title: "Interview Completed",
+        description: `Interview marked as ${resultText.toLowerCase()}.`,
+      });
     } catch (error) {
       console.error('Failed to complete interview:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete interview. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -288,15 +386,31 @@ const AdminInterviews = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => cancelInterview.mutate({
-                  id: interview.id,
-                  cancellation_reason: 'Admin cancelled interview'
-                })}
+                onClick={() => {
+                  setSelectedInterview(interview);
+                  setRescheduleData({
+                    interview_id: interview.id,
+                    interview_date: interview.interview_date,
+                    interview_time: interview.interview_time,
+                    reason: ''
+                  });
+                  setIsRescheduleDialogOpen(true);
+                }}
                 className="flex items-center gap-2"
               >
-                <XCircle className="w-4 h-4" />
-                Cancel
+                <Edit className="w-4 h-4" />
+                Reschedule
               </Button>
+            </div>
+          )}
+          
+          {/* Communication Component for Active Interviews */}
+          {interview.status === 'scheduled' && (
+            <div className="mt-4 pt-4 border-t">
+              <InterviewCommunication 
+                interview={interview} 
+                userType="admin" 
+              />
             </div>
           )}
         </div>
@@ -437,53 +551,169 @@ const AdminInterviews = () => {
         </Dialog>
       </div>
 
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Interviews</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{interviews.length}</div>
+            <p className="text-xs text-muted-foreground">
+              All time interviews
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{scheduledInterviews.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Upcoming interviews
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{completedInterviews.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Successfully completed
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {completedInterviews.length > 0 
+                ? Math.round((completedInterviews.filter(i => i.notes?.includes('PASSED')).length / completedInterviews.length) * 100)
+                : 0
+              }%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Interview success rate
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filter Controls */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by nanny name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Interview Tabs */}
       <Card>
         <Tabs defaultValue="scheduled" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="scheduled">Scheduled ({scheduledInterviews.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({completedInterviews.length})</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled ({cancelledInterviews.length})</TabsTrigger>
+            <TabsTrigger value="scheduled">Scheduled ({filteredScheduled.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({filteredCompleted.length})</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled ({filteredCancelled.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="scheduled" className="space-y-4 p-6">
-            {scheduledInterviews.length > 0 ? (
-              scheduledInterviews.map((interview) => (
+            {filteredScheduled.length > 0 ? (
+              filteredScheduled.map((interview) => (
                 <InterviewCard key={interview.id} interview={interview} />
               ))
             ) : (
               <div className="text-center py-8">
                 <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">No Scheduled Interviews</h3>
-                <p className="text-muted-foreground">No verification interviews are currently scheduled.</p>
+                <p className="text-muted-foreground">
+                  {searchTerm || statusFilter !== 'all' || dateFilter !== 'all' 
+                    ? 'No interviews match your current filters.' 
+                    : 'No verification interviews are currently scheduled.'
+                  }
+                </p>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4 p-6">
-            {completedInterviews.length > 0 ? (
-              completedInterviews.map((interview) => (
+            {filteredCompleted.length > 0 ? (
+              filteredCompleted.map((interview) => (
                 <InterviewCard key={interview.id} interview={interview} />
               ))
             ) : (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">No Completed Interviews</h3>
-                <p className="text-muted-foreground">Completed interviews will appear here.</p>
+                <p className="text-muted-foreground">
+                  {searchTerm || statusFilter !== 'all' || dateFilter !== 'all' 
+                    ? 'No interviews match your current filters.' 
+                    : 'Completed interviews will appear here.'
+                  }
+                </p>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="cancelled" className="space-y-4 p-6">
-            {cancelledInterviews.length > 0 ? (
-              cancelledInterviews.map((interview) => (
+            {filteredCancelled.length > 0 ? (
+              filteredCancelled.map((interview) => (
                 <InterviewCard key={interview.id} interview={interview} />
               ))
             ) : (
               <div className="text-center py-8">
                 <XCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">No Cancelled Interviews</h3>
-                <p className="text-muted-foreground">Cancelled interviews will appear here.</p>
+                <p className="text-muted-foreground">
+                  {searchTerm || statusFilter !== 'all' || dateFilter !== 'all' 
+                    ? 'No interviews match your current filters.' 
+                    : 'Cancelled interviews will appear here.'
+                  }
+                </p>
               </div>
             )}
           </TabsContent>
@@ -543,6 +773,63 @@ const AdminInterviews = () => {
               </Button>
               <Button onClick={handleCompleteInterview} disabled={updateInterview.isPending}>
                 {updateInterview.isPending ? 'Completing...' : 'Complete Interview'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Interview Dialog */}
+      <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule Interview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Nanny:</strong> {selectedInterview?.nanny_name}<br/>
+                <strong>Current Date:</strong> {selectedInterview?.interview_date && format(new Date(selectedInterview.interview_date), 'MMM dd, yyyy')}
+              </p>
+            </div>
+            
+            <div>
+              <Label htmlFor="reschedule_date">New Interview Date</Label>
+              <Input
+                id="reschedule_date"
+                type="date"
+                value={rescheduleData.interview_date}
+                onChange={(e) => setRescheduleData(prev => ({ ...prev, interview_date: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reschedule_time">New Time</Label>
+              <Input
+                id="reschedule_time"
+                type="time"
+                value={rescheduleData.interview_time}
+                onChange={(e) => setRescheduleData(prev => ({ ...prev, interview_time: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reschedule_reason">Reason for Rescheduling</Label>
+              <Textarea
+                id="reschedule_reason"
+                placeholder="Reason for rescheduling..."
+                value={rescheduleData.reason}
+                onChange={(e) => setRescheduleData(prev => ({ ...prev, reason: e.target.value }))}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsRescheduleDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleRescheduleInterview} disabled={updateInterview.isPending}>
+                {updateInterview.isPending ? 'Rescheduling...' : 'Reschedule Interview'}
               </Button>
             </div>
           </div>
