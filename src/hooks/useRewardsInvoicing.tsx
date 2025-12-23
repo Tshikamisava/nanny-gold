@@ -148,6 +148,30 @@ export const useGenerateClientInvoice = () => {
             sent_at: new Date().toISOString()
           });
         }
+
+        // Send admin notification for new invoice generation
+        const { data: admins } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin');
+
+        if (admins && admins.length > 0) {
+          await supabase.from('notifications').insert(
+            admins.map(admin => ({
+              user_id: admin.user_id,
+              title: 'New Invoice Generated',
+              message: `Invoice ${invoiceData.invoice_number} for R${invoiceData.amount.toFixed(2)} generated and sent to client`,
+              type: 'admin_alert',
+              data: {
+                invoice_id: invoiceData.id,
+                invoice_number: invoiceData.invoice_number,
+                client_id: invoiceData.client_id,
+                amount: invoiceData.amount,
+                action: 'invoice_generated'
+              }
+            }))
+          );
+        }
         
         toast({
           title: "Invoice Generated & Sent",

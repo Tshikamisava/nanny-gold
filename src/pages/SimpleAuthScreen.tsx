@@ -26,7 +26,7 @@ const SimpleAuthScreen = () => {
   const [referralCodeValid, setReferralCodeValid] = useState(false);
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [validatingCode, setValidatingCode] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -37,7 +37,7 @@ const SimpleAuthScreen = () => {
     userType: '',
     referralCode: ''
   });
-  
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp, resetPassword } = useAuth();
@@ -59,7 +59,7 @@ const SimpleAuthScreen = () => {
         }
       }
     };
-    
+
     redirectBasedOnRole();
   }, [user, navigate]);
 
@@ -79,19 +79,37 @@ const SimpleAuthScreen = () => {
 
     setValidatingCode(true);
     try {
-      const { data, error } = await supabase
+      // 1. Check Influencer/Partner Codes first
+      const { data: influencerData, error: influencerError } = await supabase
         .from('referral_participants')
         .select('id, discount_percentage, is_influencer, influencer_name, user_id')
         .eq('referral_code', code.toUpperCase())
         .eq('active', true)
-        .single();
+        .maybeSingle();
 
-      if (data && !error) {
+      if (influencerData && !influencerError) {
         setReferralCodeValid(true);
-        setDiscountPercentage(data.discount_percentage || 20);
+        setDiscountPercentage(influencerData.discount_percentage || 20);
         toast({
           title: "Valid Referral Code!",
-          description: `You'll receive ${data.discount_percentage || 20}% off your placement fee`,
+          description: `You'll receive ${influencerData.discount_percentage || 20}% off your placement fee`,
+        });
+        return;
+      }
+
+      // 2. Check Client Referral Codes
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id, first_name')
+        .eq('referral_code', code.toUpperCase())
+        .maybeSingle();
+
+      if (clientData && !clientError) {
+        setReferralCodeValid(true);
+        setDiscountPercentage(0); // Client referrals might not give invitee discount, only referrer reward
+        toast({
+          title: "Valid Referral Code!",
+          description: "Referral code applied successfully.",
         });
       } else {
         setReferralCodeValid(false);
@@ -118,7 +136,7 @@ const SimpleAuthScreen = () => {
     try {
       if (isLogin) {
         const { error } = await signIn(formData.email, formData.password);
-        
+
         if (error) {
           toast({
             title: "Login Failed",
@@ -156,9 +174,9 @@ const SimpleAuthScreen = () => {
 
           // Send SMS OTP
           const { data, error } = await supabase.functions.invoke('send-sms-otp', {
-            body: { 
+            body: {
               phoneNumber: formData.phone.trim(),
-              firstName: formData.firstName 
+              firstName: formData.firstName
             }
           });
 
@@ -195,7 +213,7 @@ const SimpleAuthScreen = () => {
 
         // Send email OTP
         const { data, error } = await supabase.functions.invoke('send-otp', {
-          body: { 
+          body: {
             email: formData.email.trim(),
             name: formData.firstName,
             purpose: 'signup'
@@ -221,7 +239,7 @@ const SimpleAuthScreen = () => {
         setLoading(false);
         return;
       }
-      
+
       // User state will be updated and redirect will happen via useEffect
     } catch (error: any) {
       toast({
@@ -295,7 +313,7 @@ const SimpleAuthScreen = () => {
       if (data && data.success) {
         // Extract session tokens from edge function response
         const sessionData = data.session;
-        
+
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
           toast({
             title: "Session Error",
@@ -323,11 +341,52 @@ const SimpleAuthScreen = () => {
           return;
         }
 
+        // LINK REFERRER if code was provided
+        if (pendingSignupData.referralCode) {
+          try {
+            const code = pendingSignupData.referralCode.toUpperCase();
+            // Find referrer ID (Input could be Influencer or Client code)
+            // Check Influencer
+            const { data: infData } = await supabase
+              .from('referral_participants')
+              .select('user_id')
+              .eq('referral_code', code)
+              .maybeSingle();
+
+            let referrerId = infData?.user_id;
+
+            if (!referrerId) {
+              // Check Client
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('referral_code', code)
+                .maybeSingle();
+              referrerId = clientData?.id;
+            }
+
+            if (referrerId && sessionResult.session?.user?.id) {
+              const { error: updateError } = await supabase
+                .from('clients')
+                .update({ referred_by: referrerId })
+                .eq('id', sessionResult.session.user.id);
+
+              if (updateError) {
+                console.error("Failed to link referral:", updateError);
+              } else {
+                console.log("Referral linked successfully");
+              }
+            }
+          } catch (refError) {
+            console.error("Error linking referral:", refError);
+          }
+        }
+
         toast({
           title: "Account Created Successfully!",
           description: "Welcome to NannyGold! Redirecting to your dashboard...",
         });
-        
+
         // Wait for auth state to propagate, then redirect
         setTimeout(() => {
           try {
@@ -338,7 +397,7 @@ const SimpleAuthScreen = () => {
             navigate('/dashboard');
           }
         }, 500);
-        
+
       } else {
         toast({
           title: "Verification Failed",
@@ -364,7 +423,7 @@ const SimpleAuthScreen = () => {
 
     try {
       const { error } = await resetPassword(resetEmail);
-      
+
       if (error) {
         toast({
           title: "Reset Failed",
@@ -397,16 +456,16 @@ const SimpleAuthScreen = () => {
 
   const handleResendOtp = async () => {
     if (!pendingSignupData) return;
-    
+
     setLoading(true);
     try {
       const isPhoneSignup = signupMethod === 'phone';
       const { data, error } = await supabase.functions.invoke(
         isPhoneSignup ? 'send-sms-otp' : 'send-otp',
         {
-          body: isPhoneSignup ? { 
+          body: isPhoneSignup ? {
             phoneNumber: pendingSignupData.phone.trim(),
-            firstName: pendingSignupData.firstName 
+            firstName: pendingSignupData.firstName
           } : {
             email: pendingSignupData.email.trim(),
             name: pendingSignupData.firstName,
@@ -420,7 +479,7 @@ const SimpleAuthScreen = () => {
       if (data.success) {
         toast({
           title: "OTP Sent",
-          description: isPhoneSignup 
+          description: isPhoneSignup
             ? `New verification code sent to ${data.phoneNumber || pendingSignupData.phone}`
             : `New verification code sent to ${pendingSignupData.email}`
         });
@@ -459,13 +518,13 @@ const SimpleAuthScreen = () => {
               {isLogin ? 'Sign In' : 'Join NannyGold'}
             </CardTitle>
             <p className="text-muted-foreground">
-              {isLogin 
-                ? 'Enter your credentials to access your account' 
+              {isLogin
+                ? 'Enter your credentials to access your account'
                 : 'Create your account to get started'
               }
             </p>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             {/* Forgot Password Form */}
             {showForgotPassword ? (
@@ -485,7 +544,7 @@ const SimpleAuthScreen = () => {
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -499,8 +558,8 @@ const SimpleAuthScreen = () => {
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={loading || !resetEmail}
                     className="flex-1 royal-gradient hover:opacity-90 text-white"
                   >
@@ -516,334 +575,334 @@ const SimpleAuthScreen = () => {
                 </div>
               </form>
             ) : (
-            /* OTP Verification Step for Phone Signup */
-            !isLogin && signupStep === 'otp' ? (
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleGoBackToForm}
-                    className="text-primary hover:bg-accent"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">Verify Your {signupMethod === 'phone' ? 'Phone' : 'Email'}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Enter the code sent to {signupMethod === 'phone' ? pendingSignupData?.phone : pendingSignupData?.email}
-                    </p>
-                  </div>
-                </div>
-                
-                <form onSubmit={handleOtpSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <Label className="text-foreground">Verification Code</Label>
-                    <div className="flex justify-center">
-                      <InputOTP 
-                        value={otp} 
-                        onChange={setOtp}
-                        maxLength={6}
-                        className="gap-2"
-                      >
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                        </InputOTPGroup>
-                        <InputOTPSeparator />
-                        <InputOTPGroup>
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
+              /* OTP Verification Step for Phone Signup */
+              !isLogin && signupStep === 'otp' ? (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleGoBackToForm}
+                      className="text-primary hover:bg-accent"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Verify Your {signupMethod === 'phone' ? 'Phone' : 'Email'}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Enter the code sent to {signupMethod === 'phone' ? pendingSignupData?.phone : pendingSignupData?.email}
+                      </p>
                     </div>
                   </div>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={loading || otp.length !== 6}
+
+                  <form onSubmit={handleOtpSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <Label className="text-foreground">Verification Code</Label>
+                      <div className="flex justify-center">
+                        <InputOTP
+                          value={otp}
+                          onChange={setOtp}
+                          maxLength={6}
+                          className="gap-2"
+                        >
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                          </InputOTPGroup>
+                          <InputOTPSeparator />
+                          <InputOTPGroup>
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={loading || otp.length !== 6}
+                      className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : (
+                        'Verify & Create Account'
+                      )}
+                    </Button>
+                  </form>
+
+                  <div className="text-center text-sm text-muted-foreground">
+                    Didn't receive the code?{' '}
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-primary"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                    >
+                      Resend
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Main Login/Signup Form */
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* HIDDEN: Signup Method Selector - kept for post-launch */}
+                  {false && !isLogin && (
+                    <div className="flex bg-muted rounded-lg p-1 mb-6">
+                      <Button
+                        type="button"
+                        variant={signupMethod === 'email' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setSignupMethod('email')}
+                        className="flex-1"
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Email
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={signupMethod === 'phone' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setSignupMethod('phone')}
+                        className="flex-1"
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Phone
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isLogin && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName" className="text-foreground">First Name</Label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="firstName"
+                              name="firstName"
+                              type="text"
+                              placeholder="John"
+                              value={formData.firstName}
+                              onChange={handleInputChange}
+                              className="pl-10"
+                              required={!isLogin}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName" className="text-foreground">Last Name</Label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="lastName"
+                              name="lastName"
+                              type="text"
+                              placeholder="Doe"
+                              value={formData.lastName}
+                              onChange={handleInputChange}
+                              className="pl-10"
+                              required={!isLogin}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="userType" className="text-foreground">I am a...</Label>
+                        <Select
+                          value={formData.userType}
+                          onValueChange={(value) => {
+                            setFormData(prev => ({ ...prev, userType: value }));
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select your role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="client">Chief of Home seeking family support</SelectItem>
+                            <SelectItem value="nanny">Family Support Specialist offering family support</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+
+                      {/* Referral Code Input - Only show for clients */}
+                      {formData.userType === 'client' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="referralCode" className="text-foreground">
+                            Referral Code <span className="text-muted-foreground text-xs">(Optional)</span>
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="referralCode"
+                              name="referralCode"
+                              type="text"
+                              placeholder="Enter your referral code"
+                              value={formData.referralCode}
+                              onChange={(e) => {
+                                const code = e.target.value.toUpperCase();
+                                setFormData({ ...formData, referralCode: code });
+                                if (code.length >= 6) {
+                                  validateReferralCode(code);
+                                } else {
+                                  setReferralCodeValid(false);
+                                  setDiscountPercentage(0);
+                                }
+                              }}
+                              className="uppercase"
+                              maxLength={20}
+                            />
+                            {validatingCode && (
+                              <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+                          {referralCodeValid && formData.referralCode && (
+                            <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                              <div className="flex-shrink-0 mt-0.5">
+                                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                                  Code Applied Successfully!
+                                </p>
+                                <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                                  Get {discountPercentage}% off your placement fee
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {formData.referralCode && formData.referralCode.length >= 6 && !referralCodeValid && !validatingCode && (
+                            <p className="text-sm text-destructive flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                              </svg>
+                              Invalid or expired referral code
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* HIDDEN: Phone field - kept for post-launch */}
+                      <div className="space-y-2" style={{ display: 'none' }}>
+                        <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            placeholder="0123456789"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            className="pl-10"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {signupMethod === 'phone'
+                            ? 'SMS verification will be sent to this number'
+                            : 'Required for account security and notifications'
+                          }
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-foreground">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="john@example.com"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {signupMethod === 'email' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-foreground">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="pl-10 pr-10"
+                          required
+                          minLength={6}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isLogin && signupMethod === 'email' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          className="pl-10"
+                          required={!isLogin && signupMethod === 'email'}
+                          minLength={6}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
                     className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Verifying...
+                        {isLogin ? 'Signing In...' : 'Creating Account...'}
                       </>
                     ) : (
-                      'Verify & Create Account'
+                      isLogin ? 'Sign In' : 'Create Account'
                     )}
                   </Button>
                 </form>
-                
-                <div className="text-center text-sm text-muted-foreground">
-                  Didn't receive the code?{' '}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={handleResendOtp}
-                    disabled={loading}
-                  >
-                    Resend
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              /* Main Login/Signup Form */
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* HIDDEN: Signup Method Selector - kept for post-launch */}
-                {false && !isLogin && (
-                  <div className="flex bg-muted rounded-lg p-1 mb-6">
-                    <Button
-                      type="button"
-                      variant={signupMethod === 'email' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setSignupMethod('email')}
-                      className="flex-1"
-                    >
-                      <Mail className="w-4 h-4 mr-2" />
-                      Email
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={signupMethod === 'phone' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setSignupMethod('phone')}
-                      className="flex-1"
-                    >
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Phone
-                    </Button>
-                  </div>
-                )}
+              ))}
 
-                {!isLogin && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName" className="text-foreground">First Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="firstName"
-                            name="firstName"
-                            type="text"
-                            placeholder="John"
-                            value={formData.firstName}
-                            onChange={handleInputChange}
-                            className="pl-10"
-                            required={!isLogin}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName" className="text-foreground">Last Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="lastName"
-                            name="lastName"
-                            type="text"
-                            placeholder="Doe"
-                            value={formData.lastName}
-                            onChange={handleInputChange}
-                            className="pl-10"
-                            required={!isLogin}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="userType" className="text-foreground">I am a...</Label>
-                      <Select 
-                        value={formData.userType} 
-                        onValueChange={(value) => {
-                          setFormData(prev => ({...prev, userType: value}));
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="client">Chief of Home seeking family support</SelectItem>
-                          <SelectItem value="nanny">Family Support Specialist offering family support</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-
-                    {/* Referral Code Input - Only show for clients */}
-                    {formData.userType === 'client' && (
-                      <div className="space-y-2">
-                        <Label htmlFor="referralCode" className="text-foreground">
-                          Referral Code <span className="text-muted-foreground text-xs">(Optional)</span>
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="referralCode"
-                            name="referralCode"
-                            type="text"
-                            placeholder="Enter your referral code"
-                            value={formData.referralCode}
-                            onChange={(e) => {
-                              const code = e.target.value.toUpperCase();
-                              setFormData({...formData, referralCode: code});
-                              if (code.length >= 6) {
-                                validateReferralCode(code);
-                              } else {
-                                setReferralCodeValid(false);
-                                setDiscountPercentage(0);
-                              }
-                            }}
-                            className="uppercase"
-                            maxLength={20}
-                          />
-                          {validatingCode && (
-                            <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                        {referralCodeValid && formData.referralCode && (
-                          <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
-                            <div className="flex-shrink-0 mt-0.5">
-                              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                                Code Applied Successfully!
-                              </p>
-                              <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
-                                Get {discountPercentage}% off your placement fee
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {formData.referralCode && formData.referralCode.length >= 6 && !referralCodeValid && !validatingCode && (
-                          <p className="text-sm text-destructive flex items-center gap-1">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
-                            </svg>
-                            Invalid or expired referral code
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* HIDDEN: Phone field - kept for post-launch */}
-                    <div className="space-y-2" style={{ display: 'none' }}>
-                      <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="0123456789"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          className="pl-10"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {signupMethod === 'phone' 
-                          ? 'SMS verification will be sent to this number' 
-                          : 'Required for account security and notifications'
-                        }
-                      </p>
-                    </div>
-                  </>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="john@example.com"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                {signupMethod === 'email' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-foreground">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="password"
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="pl-10 pr-10"
-                        required
-                        minLength={6}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                
-                {!isLogin && signupMethod === 'email' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className="pl-10"
-                        required={!isLogin && signupMethod === 'email'}
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {isLogin ? 'Signing In...' : 'Creating Account...'}
-                    </>
-                  ) : (
-                    isLogin ? 'Sign In' : 'Create Account'
-                  )}
-                </Button>
-              </form>
-            ))}
-            
             {/* Forgot Password Section */}
             {isLogin && !showForgotPassword && (
               <div className="text-center">
@@ -867,8 +926,8 @@ const SimpleAuthScreen = () => {
                   className="text-primary hover:underline text-sm"
                   disabled={loading}
                 >
-                  {isLogin 
-                    ? "Don't have an account? Sign up" 
+                  {isLogin
+                    ? "Don't have an account? Sign up"
                     : 'Already have an account? Sign in'
                   }
                 </button>
@@ -876,9 +935,9 @@ const SimpleAuthScreen = () => {
             )}
           </CardContent>
         </Card>
-        
+
         <div className="mt-6 text-center">
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="text-muted-foreground hover:text-primary text-sm"
           >

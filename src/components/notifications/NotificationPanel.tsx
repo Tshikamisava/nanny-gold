@@ -84,6 +84,8 @@ export default function NotificationPanel() {
         return '/nanny/messages';
       case 'payment_received':
         return '/admin/payments';
+      case 'admin_alert':
+        return '/admin/invoice-management';
       default:
         return null;
     }
