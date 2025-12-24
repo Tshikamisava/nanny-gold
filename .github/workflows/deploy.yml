@@ -3,7 +3,7 @@ name: Deploy to Domains.co.za (FTP + Supabase Safe)
 on:
   push:
     branches:
-      - Lucky
+      - main
 
 jobs:
   deploy:
