@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -25,18 +26,82 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Deploy frontend to Domains.co.za (FTP)
+      - name: List built files (for debugging)
+        run: ls -la dist/
+
+      - name: Test FTP connection
+        uses: SamKirkland/FTP-Deploy-Action/test@v4.3.5
+        id: test-ftp
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps  # Try FTPS first
+          port: 21
+          security: loose
+          timeout: 300000  # 5 minutes
+          dry-run: true
+
+      - name: Deploy frontend to Domains.co.za (FTPS)
+        if: steps.test-ftp.outputs.server-ftp-connected == 'true'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
+          protocol: ftps
           port: 21
-          passive: true
-          timeout: 600000
+          security: loose
           local-dir: dist/
           server-dir: /public_html/app.nannygold.co.za/
+          exclude: |
+            **/.git*
+            **/.git*/*
+            **/node_modules/**
+            **/.github/**
+            **/src/**
+            **/*.md
+            **/*.map
+            **/*.log
+            **/.env*
+            **/*.env*
+            **/vite.config.*
+            **/package*.json
+            **/tsconfig.json
+            **/*.ts
+            **/*.tsx
+            **/README.md
+          log-level: debug
+
+      - name: Fallback to SFTP if FTPS fails
+        if: steps.test-ftp.outputs.server-ftp-connected != 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: sftp
+          port: 22
+          local-dir: dist/
+          server-dir: /public_html/app.nannygold.co.za/
+          exclude: |
+            **/.git*
+            **/.git*/*
+            **/node_modules/**
+            **/.github/**
+            **/src/**
+            **/*.md
+            **/*.map
+            **/*.log
+            **/.env*
+            **/*.env*
+            **/vite.config.*
+            **/package*.json
+            **/tsconfig.json
+            **/*.ts
+            **/*.tsx
+            **/README.md
+          log-level: debug
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
