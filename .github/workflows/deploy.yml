@@ -1,4 +1,4 @@
-name: Deploy to Domains.co.za (FTP + Supabase Safe)
+name: CI/CD Deploy to Domains.co.za with Supabase
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -22,20 +22,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      
-
       - name: Build application
         run: npm run build
 
-      - name: Deploy via FTP
+      - name: Deploy frontend to Domains.co.za (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
           port: 21
+          passive: true
+          timeout: 600000
           local-dir: dist/
-          server-dir: /
+          server-dir: /public_html/app.nannygold.co.za/
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -48,8 +49,8 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
-      - name: Apply database migrations
+      - name: Run Supabase database migrations
         run: supabase migration up
 
-      - name: Deploy Supabase functions
+      - name: Deploy Supabase Edge Functions
         run: supabase functions deploy
