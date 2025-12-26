@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
+import { useQueryClient } from '@tanstack/react-query';
 import { BookingProvider } from "./contexts/BookingContext";
 import { AuthProvider } from "./components/AuthProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
