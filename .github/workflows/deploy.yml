@@ -1,5 +1,5 @@
 name: CI/CD Deploy to Domains.co.za with Supabase
- run: deploy --log-level verbose
+
 on:
   push:
     branches:
@@ -57,7 +57,7 @@ jobs:
             **/*.ts
             **/*.tsx
             **/README.md
-          log-level: debug
+          log-level: verbose
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
