@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { useQueryClient } from '@tanstack/react-query';
 import { BookingProvider } from "./contexts/BookingContext";
 import { AuthProvider } from "./components/AuthProvider";
@@ -18,6 +18,7 @@ import { ClientProfileGate } from "./components/ClientProfileGate";
 import { UserCleanup } from "./components/UserCleanup";
 import { Skeleton } from "@/components/ui/skeleton";
 import AuthRedirect from "./components/AuthRedirect";
+import { initializeDataPreloading } from "./utils/dataPreloader";
 import { PublicLayout } from "./layouts/PublicLayout";
 
 // Critical pages (loaded immediately)
