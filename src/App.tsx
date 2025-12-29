@@ -180,28 +180,28 @@ const App = () => {
             <BrowserRouter future={{ v7_relativeSplatPath: true }}>
               <Routes>
                 {/* Public Routes with Layout */}
+                <Route path="/" element={
+                  <PublicRoute>
+                    <LandingScreen />
+                  </PublicRoute>
+                } />
+                <Route path="/auth" element={
+                  <PublicRoute>
+                    <SimpleAuthScreen />
+                  </PublicRoute>
+                } />
+                <Route path="/login" element={
+                  <PublicRoute>
+                    <LoginScreen />
+                  </PublicRoute>
+                } />
+                <Route path="/signup" element={<Navigate to="/auth?mode=signup" replace />} />
+                <Route path="/enhanced-signup" element={
+                  <PublicRoute>
+                    <Suspense fallback={<PageLoader />}><EnhancedSignup /></Suspense>
+                  </PublicRoute>
+                } />
                 <Route element={<PublicLayout />}>
-                  <Route path="/" element={
-                    <PublicRoute>
-                      <LandingScreen />
-                    </PublicRoute>
-                  } />
-                  <Route path="/auth" element={
-                    <PublicRoute>
-                      <SimpleAuthScreen />
-                    </PublicRoute>
-                  } />
-                  <Route path="/login" element={
-                    <PublicRoute>
-                      <LoginScreen />
-                    </PublicRoute>
-                  } />
-                  <Route path="/signup" element={<Navigate to="/auth?mode=signup" replace />} />
-                  <Route path="/enhanced-signup" element={
-                    <PublicRoute>
-                      <Suspense fallback={<PageLoader />}><EnhancedSignup /></Suspense>
-                    </PublicRoute>
-                  } />
                   <Route path="/admin-login" element={
                     <PublicRoute>
                       <AdminLogin />

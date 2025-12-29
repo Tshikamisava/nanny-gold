@@ -1,9 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
 import { useAuth } from './useAuth';
 
-type BookingReassignment = Tables<'booking_reassignments'>;
 
 export const useBookingReassignments = () => {
   const { user } = useAuth();
