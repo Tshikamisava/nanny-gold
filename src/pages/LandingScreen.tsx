@@ -9,7 +9,7 @@ const LandingScreen = () => {
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="text-center space-y-6">
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-3xl sm:text-4xl font-bold">
             <span className="text-fuchsia-600">Nanny</span>
             <span className="gold-shimmer">Gold</span>
           </h1>

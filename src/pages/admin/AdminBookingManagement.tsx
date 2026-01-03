@@ -383,7 +383,7 @@ export default function AdminBookingManagement() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-[11px] sm:text-xs md:text-sm font-medium">Total Bookings</CardTitle>
@@ -642,8 +642,8 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
         const bookingType = getBookingTypeDisplay(booking.booking_type);
 
         return (
-          <div key={booking.id} className="p-4 border rounded-lg hover:bg-gray-50">
-            <div className="flex items-center justify-between mb-4">
+          <div key={booking.id} className="p-4 border rounded-lg hover:bg-gray-50 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-r from-fuchsia-100 to-pink-100 flex items-center justify-center">
                   <Users className="w-6 h-6 text-fuchsia-600" />
@@ -668,7 +668,7 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="flex items-center space-x-4">
                 <p className="font-semibold text-gray-900">
                   Client Pays: {formatCurrency(booking.total_monthly_cost)}
                 </p>
@@ -737,7 +737,7 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-gray-600">Start Date</p>
                 <p className="font-medium">{format(new Date(booking.start_date), 'MMM dd, yyyy')}</p>
@@ -769,7 +769,7 @@ function BookingsList({ bookings, onReassign, onCancel, onViewDetails, onMessage
               />
             </div>
 
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 size="sm" 
                 variant="outline"

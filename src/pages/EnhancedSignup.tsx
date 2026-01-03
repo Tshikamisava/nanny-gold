@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Loader2, Mail, Lock, User, Phone, Eye, EyeOff, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function EnhancedSignup() {
   const [searchParams] = useSearchParams();
@@ -27,6 +28,7 @@ export default function EnhancedSignup() {
     email: '',
     phone: '',
     password: '',
+    userType: '',
   });
 
   const [passwordStrength, setPasswordStrength] = useState({
@@ -96,6 +98,16 @@ export default function EnhancedSignup() {
       });
       return false;
     }
+
+    if (!formData.userType) {
+      toast({
+        title: "Role Required",
+        description: "Please select your role",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     return true;
   };
 
@@ -166,6 +178,7 @@ export default function EnhancedSignup() {
         body: {
           email: formData.email.trim().toLowerCase(),
           name: formData.firstName,
+          phone: formData.phone, // Include phone number
           purpose: 'signup'
         }
       });
@@ -179,8 +192,17 @@ export default function EnhancedSignup() {
         description: `Check your email at ${formData.email}`,
       });
 
-      // Navigate to OTP verification with user data
-      navigate(`/otp-verification?email=${encodeURIComponent(formData.email)}&name=${encodeURIComponent(`${formData.firstName} ${formData.lastName}`)}&phone=${encodeURIComponent(formData.phone)}&password=${encodeURIComponent(formData.password)}`);
+      // Store signup data in sessionStorage temporarily
+      sessionStorage.setItem('signupData', JSON.stringify({
+        email: formData.email,
+        name: `${formData.firstName} ${formData.lastName}`,
+        phone: formData.phone,
+        password: formData.password,
+        userType: formData.userType
+      }));
+
+      // Navigate to OTP verification
+      navigate(`/otp-verification?email=${encodeURIComponent(formData.email)}`);
 
     } catch (error: any) {
       toast({
@@ -279,11 +301,27 @@ export default function EnhancedSignup() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="userType">I am a...</Label>
+                  <Select
+                    value={formData.userType}
+                    onValueChange={(value) => setFormData({ ...formData, userType: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Chief of Home seeking family support</SelectItem>
+                      <SelectItem value="nanny">Family Support Specialist offering family support</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Button
                   type="button"
                   onClick={handleNext}
                   className="w-full"
-                  disabled={!formData.firstName.trim() || !formData.lastName.trim()}
+                  disabled={!formData.firstName.trim() || !formData.lastName.trim() || !formData.userType}
                 >
                   Continue
                 </Button>
@@ -453,7 +491,7 @@ export default function EnhancedSignup() {
                 type="button"
                 variant="link"
                 className="p-0 h-auto font-semibold text-primary"
-                onClick={() => navigate('/auth?mode=signin')}
+                onClick={() => navigate('/login')}
               >
                 Sign in
               </Button>

@@ -3,7 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface VerifyOtpRequest {
@@ -16,111 +18,104 @@ interface VerifyOtpRequest {
     phone?: string;
     user_type: string;
     password?: string;
+    referral_code?: string;
   };
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  // Log request info for debugging
+  console.log(`[DEBUG] Received ${req.method} request to verify-email-otp`);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
-    const { email, otp, purpose, userData }: VerifyOtpRequest = await req.json();
-    console.log(`Verifying OTP for ${email}, purpose: ${purpose}, code: ${otp}`);
+    const body = await req.json().catch(err => {
+      console.error("[ERROR] Failed to parse request body:", err);
+      return null;
+    });
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    if (!body) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid request body" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-    // First, let's check all OTPs for this email and purpose for debugging
-    const { data: allOtps } = await supabaseClient
-      .from('temp_otp_codes')
-      .select('*')
-      .eq('identifier', email)
-      .eq('purpose', purpose)
-      .order('created_at', { ascending: false })
-      .limit(3);
+    const { email, otp, purpose, userData }: VerifyOtpRequest = body;
+    console.log(`[DEBUG] Verifying OTP for ${email}, purpose: ${purpose}`);
 
-    console.log('All recent OTPs for this email:', allOtps);
+    if (!email || !otp) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Email and verification code are required" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-    // Verify OTP - use maybeSingle() to avoid errors when no record is found
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedOtp = String(otp).trim();
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[ERROR] Missing environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      return new Response(
+        JSON.stringify({ success: false, error: "Server configuration error" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify OTP
     const { data: otpRecord, error: otpError } = await supabaseClient
       .from('temp_otp_codes')
       .select('*')
-      .eq('identifier', email)
-      .eq('code', otp)
-      .eq('purpose', purpose)
+      .eq('identifier', normalizedEmail)
+      .eq('code', normalizedOtp)
+      .eq('purpose', purpose || 'signup')
       .eq('used', false)
-      .gt('expires_at', new Date().toISOString())
+      .gt('expires_at', 'now()')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    console.log('OTP query result:', { otpRecord, otpError });
-    console.log('Current time:', new Date().toISOString());
-
     if (otpError) {
-      console.error('OTP query error:', otpError);
+      console.error('[ERROR] OTP query error:', otpError);
       return new Response(
-        JSON.stringify({ error: "Database error while verifying OTP" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ success: false, error: "Database error while verifying OTP" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
     if (!otpRecord) {
-      console.log('No valid OTP found for:', { email, otp, purpose });
-      
-      // Check if there's a matching OTP that's been used or expired
-      const { data: usedOrExpiredOtp } = await supabaseClient
-        .from('temp_otp_codes')
-        .select('*')
-        .eq('identifier', email)
-        .eq('code', otp)
-        .eq('purpose', purpose)
-        .maybeSingle();
-
-      if (usedOrExpiredOtp) {
-        if (usedOrExpiredOtp.used) {
-          console.log('OTP has already been used');
-          return new Response(
-            JSON.stringify({ error: "This code has already been used. Please request a new one." }),
-            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-          );
-        } else if (new Date(usedOrExpiredOtp.expires_at) < new Date()) {
-          console.log('OTP has expired');
-          return new Response(
-            JSON.stringify({ error: "This code has expired. Please request a new one." }),
-            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-          );
-        }
-      }
-
+      console.log('[DEBUG] No valid OTP found for:', email);
       return new Response(
-        JSON.stringify({ error: "Invalid verification code. Please check and try again." }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ success: false, error: "Invalid or expired verification code. Please request a new one." }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
     // Mark OTP as used
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from('temp_otp_codes')
       .update({ used: true })
       .eq('id', otpRecord.id);
 
-    if (updateError) {
-      console.error('Error marking OTP as used:', updateError);
-      // Continue anyway, as the main verification was successful
-    }
-
     if (purpose === 'signup') {
-      // Validate password is provided
       if (!userData?.password || userData.password.length < 8) {
         return new Response(
-          JSON.stringify({ error: "Password must be at least 8 characters" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          JSON.stringify({ success: false, error: "Password must be at least 8 characters" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
-      // Create user account with provided password
+      console.log(`[DEBUG] Creating user account for ${email}`);
       const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
         email,
         password: userData.password,
@@ -129,52 +124,48 @@ const handler = async (req: Request): Promise<Response> => {
           first_name: userData?.first_name,
           last_name: userData?.last_name,
           phone: userData?.phone,
-          user_type: userData?.user_type || 'nanny',
+          user_type: userData?.user_type || 'client',
           verified_via_otp: true
         }
       });
 
       if (authError) {
-        console.error('User creation error:', authError);
+        console.error('[ERROR] User creation error:', authError);
+        let errorMsg = authError.message;
+        if (errorMsg.includes('already exists')) {
+          errorMsg = "An account with this email already exists";
+        }
         return new Response(
-          JSON.stringify({ error: authError.message }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          JSON.stringify({ success: false, error: errorMsg }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
-      // Generate session tokens
+      console.log(`[DEBUG] Generating session for ${email}`);
       const { data: sessionData, error: sessionError } = await supabaseClient.auth.admin.generateLink({
         type: 'magiclink',
         email: email,
       });
 
-      if (sessionError) {
-        console.error('Session generation error:', sessionError);
+      if (sessionError || !sessionData?.properties) {
+        console.error('[ERROR] Session generation error:', sessionError);
         return new Response(
-          JSON.stringify({ error: "Failed to create session" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          JSON.stringify({ success: false, error: "Account created but failed to sign in automatically. Please log in manually." }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
-      // Store referral code in clients table if provided
-      if (userData.referral_code && authData?.user?.id) {
-        const { error: clientUpdateError } = await supabaseClient
+      // Store referral if provided
+      if (userData?.referral_code && authData?.user?.id) {
+        await supabaseClient
           .from('clients')
-          .update({ 
-            referral_code_used: userData.referral_code.toUpperCase() 
-          })
+          .update({ referral_code_used: userData.referral_code.toUpperCase() })
           .eq('id', authData.user.id);
-          
-        if (clientUpdateError) {
-          console.error('Error storing referral code:', clientUpdateError);
-        } else {
-          console.log('✅ Referral code stored:', userData.referral_code);
-        }
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: "Account created successfully",
           user: authData.user,
           session: {
@@ -185,51 +176,33 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     } else if (purpose === 'password_reset') {
-      console.log('Processing password reset for:', email);
-      
-      // Find the user first
-      const { data: users, error: userError } = await supabaseClient.auth.admin.listUsers();
-      if (userError) {
-        console.error('Error listing users:', userError);
-        return new Response(
-          JSON.stringify({ error: "Failed to find user" }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      const user = users?.users?.find(u => u.email === email);
-      
+      // Find existing user
+      const { data: usersData, error: userError } = await supabaseClient.auth.admin.listUsers();
+      const user = usersData?.users.find((u: any) => u.email === email);
+
       if (!user) {
-        console.log('User not found for email:', email);
         return new Response(
-          JSON.stringify({ error: "User not found" }),
-          { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          JSON.stringify({ success: false, error: "No account found with this email" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
-      // Generate password reset session  
       const { data: sessionData, error: sessionError } = await supabaseClient.auth.admin.generateLink({
         type: 'recovery',
         email: email
       });
 
       if (sessionError) {
-        console.error('Session generation error:', sessionError);
         return new Response(
-          JSON.stringify({ error: "Failed to generate reset session" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          JSON.stringify({ success: false, error: "Failed to generate reset link" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
-      console.log('Password reset session generated successfully');
-      
-      // Return a reset token that can be used to update password
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "OTP verified successfully",
+        JSON.stringify({
+          success: true,
           user: user,
-          reset_token: sessionData.properties?.access_token, // Special token for password reset
           session: {
             access_token: sessionData.properties?.access_token,
             refresh_token: sessionData.properties?.refresh_token
@@ -240,17 +213,17 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: "OTP verified successfully" }),
+      JSON.stringify({ success: true, message: "OTP verified" }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error: any) {
-    console.error("Error in verify-email-otp function:", error);
+    console.error("[CRITICAL ERROR] Error in verify-email-otp function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ success: false, error: error.message || "Internal server error" }),
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 };
 
-serve(handler);
+Deno.serve(handler);

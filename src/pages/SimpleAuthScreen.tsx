@@ -220,6 +220,8 @@ const SimpleAuthScreen = () => {
           }
         });
 
+        console.log('OTP verification response:', { data, error });
+
         if (error || !data.success) {
           toast({
             title: "Email Failed",
@@ -299,11 +301,32 @@ const SimpleAuthScreen = () => {
         }
       );
 
-      if (error) {
-        console.error('OTP verification error:', error);
+      console.log('OTP verification response:', { data, error });
+
+      if (error || !data?.success) {
+        // Detailed error logging as requested
+        const functionsError = error as any;
+        console.error("--- EDGE FUNCTION ERROR DEBUG ---");
+        console.error("Status:", functionsError?.status || functionsError?.context?.status);
+        console.error("Message:", functionsError?.message);
+        const details = functionsError?.details || functionsError?.context?.details || functionsError?.context;
+        console.error("Details:", details);
+        console.error("Data Error:", data?.error);
+        console.error("---------------------------------");
+
+        let errorMessage = data?.error || "Invalid verification code. Please try again.";
+
+        if (error?.message) {
+          if (error.message.includes("already exists")) {
+            errorMessage = "An account with this email already exists.";
+          } else if (error.message !== "Edge Function returned a non-2xx status code") {
+            errorMessage = error.message;
+          }
+        }
+
         toast({
           title: "Verification Failed",
-          description: error.message || "Invalid verification code. Please try again.",
+          description: errorMessage,
           variant: "destructive"
         });
         setLoading(false);

@@ -185,17 +185,13 @@ const App = () => {
                     <LandingScreen />
                   </PublicRoute>
                 } />
-                <Route path="/auth" element={
-                  <PublicRoute>
-                    <SimpleAuthScreen />
-                  </PublicRoute>
-                } />
+                <Route path="/auth" element={<Navigate to="/enhanced-signup" replace />} />
                 <Route path="/login" element={
                   <PublicRoute>
                     <LoginScreen />
                   </PublicRoute>
                 } />
-                <Route path="/signup" element={<Navigate to="/auth?mode=signup" replace />} />
+                <Route path="/signup" element={<Navigate to="/enhanced-signup" replace />} />
                 <Route path="/enhanced-signup" element={
                   <PublicRoute>
                     <Suspense fallback={<PageLoader />}><EnhancedSignup /></Suspense>

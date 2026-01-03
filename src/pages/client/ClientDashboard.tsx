@@ -10,11 +10,11 @@ import { useInterviews } from '@/hooks/useInterviews';
 import { useProfileCompletion, useClientProfile } from '@/hooks/useClientProfile';
 import { useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
-import { 
-  Calendar, 
-  CheckCircle, 
-  Clock, 
-  User, 
+import {
+  Calendar,
+  CheckCircle,
+  Clock,
+  User,
   Star,
   Search,
   UserPlus,
@@ -51,13 +51,13 @@ export default function ClientDashboard() {
   const [historyPage, setHistoryPage] = useState(1);
   const [overviewPage, setOverviewPage] = useState(1);
   const itemsPerPage = 5;
-  
+
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { toast } = useToast();
   const { data: bookings, isLoading: bookingsLoading, refetch: refetchBookings } = useBookings();
   const { data: interviews, isLoading: interviewsLoading } = useInterviews();
-  
+
   console.log('ClientDashboard - User ID:', user?.id);
   console.log('ClientDashboard - Bookings count:', bookings?.length || 0);
   console.log('ClientDashboard - Interviews count:', interviews?.length || 0);
@@ -73,30 +73,30 @@ export default function ClientDashboard() {
   }, [user?.id, forceRefetch]);
 
   // Memoize expensive calculations
-  const pendingBookings = useMemo(() => 
-    bookings?.filter(booking => booking.status === 'pending') || [], 
+  const pendingBookings = useMemo(() =>
+    bookings?.filter(booking => booking.status === 'pending') || [],
     [bookings]
   );
 
-  const activeBookings = useMemo(() => 
-    bookings?.filter(booking => 
+  const activeBookings = useMemo(() =>
+    bookings?.filter(booking =>
       booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'active'
     ) || [], [bookings]
   );
-  
-  const completedBookings = useMemo(() => 
-    bookings?.filter(booking => 
+
+  const completedBookings = useMemo(() =>
+    bookings?.filter(booking =>
       booking.status === 'completed'
     ) || [], [bookings]
   );
 
-  const cancelledBookings = useMemo(() => 
-    bookings?.filter(booking => booking.status === 'cancelled') || [], 
+  const cancelledBookings = useMemo(() =>
+    bookings?.filter(booking => booking.status === 'cancelled') || [],
     [bookings]
   );
-  
-  const upcomingInterviews = useMemo(() => 
-    interviews?.filter(interview => 
+
+  const upcomingInterviews = useMemo(() =>
+    interviews?.filter(interview =>
       interview.status === 'scheduled' && new Date(interview.interview_date) >= new Date()
     ) || [], [interviews]
   );
@@ -119,10 +119,10 @@ export default function ClientDashboard() {
         filter: `client_id=eq.${user.id}`
       }, (payload) => {
         console.log('📡 Booking change detected:', payload.eventType, payload.new?.id);
-        
+
         // Invalidate and refetch to get fresh data with joins
         refetchBookings();
-        
+
         // Show appropriate notification based on event type
         if (payload.eventType === 'INSERT') {
           toast({
@@ -132,7 +132,7 @@ export default function ClientDashboard() {
         } else if (payload.eventType === 'UPDATE') {
           const oldStatus = payload.old?.status;
           const newStatus = payload.new?.status;
-          
+
           if (newStatus === 'confirmed' && oldStatus !== 'confirmed') {
             toast({
               title: "Booking Confirmed",
@@ -182,15 +182,15 @@ export default function ClientDashboard() {
   useEffect(() => {
     const fetchInvoiceStats = async () => {
       if (!user?.id) return;
-      
+
       const { data: invoices } = await supabase
         .from('invoices')
         .select('amount, status')
         .eq('client_id', user.id)
         .eq('status', 'paid');
-      
+
       const totalSpent = invoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0;
-      
+
       if (!bookingsLoading && !interviewsLoading && bookings) {
         setStats({
           totalBookings: bookings.length,
@@ -201,7 +201,7 @@ export default function ClientDashboard() {
         setLoading(false);
       }
     };
-    
+
     fetchInvoiceStats();
   }, [bookingsLoading, interviewsLoading, bookings?.length, activeBookings.length, pendingBookings.length, user?.id]);
 
@@ -217,8 +217,8 @@ export default function ClientDashboard() {
   }
 
   // Determine if user is new (no bookings and no interviews)
-  const isNewUser = !bookingsLoading && !interviewsLoading && 
-                    bookings?.length === 0 && interviews?.length === 0;
+  const isNewUser = !bookingsLoading && !interviewsLoading &&
+    bookings?.length === 0 && interviews?.length === 0;
 
   return (
     <div className="space-y-4 md:space-y-6 p-4 md:p-0">
@@ -244,8 +244,8 @@ export default function ClientDashboard() {
                   </p>
                 </div>
                 <Progress value={completionPercentage} className="h-2" />
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => navigate('/client/profile-settings')}
                   className="w-full sm:w-auto"
                 >
@@ -260,7 +260,7 @@ export default function ClientDashboard() {
 
       {/* Quick Actions for New Users */}
       {isNewUser && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <Card className="border-primary/20 hover:border-primary/50 transition-colors cursor-pointer" onClick={() => navigate('/service-prompt')}>
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -304,7 +304,7 @@ export default function ClientDashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="hover-scale">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-[11px] sm:text-xs md:text-sm font-medium">Active Bookings</CardTitle>
@@ -369,7 +369,7 @@ export default function ClientDashboard() {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           {/* Recent Activity */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg md:text-xl">Active Bookings</CardTitle>
@@ -391,36 +391,36 @@ export default function ClientDashboard() {
                     activeBookings
                       .slice((overviewPage - 1) * itemsPerPage, overviewPage * itemsPerPage)
                       .map((booking) => (
-                      <div key={booking.id} className="space-y-2">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 sm:p-3 bg-accent/10 rounded-lg gap-2">
-                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-xs sm:text-sm md:text-base truncate">
-                                {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
-                              </p>
-                              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">
-                                Started {format(new Date(booking.start_date), 'MMM dd, yyyy')}
-                              </p>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                                R{booking.total_monthly_cost?.toFixed(2)}/month
-                              </p>
+                        <div key={booking.id} className="space-y-2">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 sm:p-3 bg-accent/10 rounded-lg gap-2">
+                            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-xs sm:text-sm md:text-base truncate">
+                                  {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
+                                </p>
+                                <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">
+                                  Started {format(new Date(booking.start_date), 'MMM dd, yyyy')}
+                                </p>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                                  R{booking.total_monthly_cost?.toFixed(2)}/month
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                              <Badge variant="secondary" className="text-xs shrink-0">{booking.status}</Badge>
+                              <BookingModificationDialog
+                                booking={booking}
+                                onModificationSubmitted={handleModificationSubmitted}
+                              />
                             </div>
                           </div>
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                            <Badge variant="secondary" className="text-xs">{booking.status}</Badge>
-                            <BookingModificationDialog 
-                              booking={booking} 
-                              onModificationSubmitted={handleModificationSubmitted}
-                            />
-                          </div>
+                          <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
                         </div>
-                        <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
-                      </div>
-                    ))
+                      ))
                   )}
                 </div>
-                
+
                 {/* Pagination for Overview Active Bookings */}
                 {activeBookings.length > itemsPerPage && (
                   <div className="flex items-center justify-center gap-2 pt-4">
@@ -459,31 +459,31 @@ export default function ClientDashboard() {
                   {activeBookings
                     .slice((overviewPage - 1) * itemsPerPage, overviewPage * itemsPerPage)
                     .map((booking) => (
-                    <div key={booking.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-sm">
-                            {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
-                          </h4>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(booking.start_date), 'PPP')} - 
-                            {booking.end_date ? format(new Date(booking.end_date), 'PPP') : 'Ongoing'}
-                          </p>
-                          <p className="text-sm font-medium">R{booking.total_monthly_cost?.toFixed(2)}/month</p>
+                      <div key={booking.id} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-sm">
+                              {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Session'}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(booking.start_date), 'PPP')} -
+                              {booking.end_date ? format(new Date(booking.end_date), 'PPP') : 'Ongoing'}
+                            </p>
+                            <p className="text-sm font-medium">R{booking.total_monthly_cost?.toFixed(2)}/month</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'} className="shrink-0">
+                              {booking.status}
+                            </Badge>
+                            <BookingModificationDialog
+                              booking={booking}
+                              onModificationSubmitted={handleModificationSubmitted}
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
-                            {booking.status}
-                          </Badge>
-                          <BookingModificationDialog 
-                            booking={booking} 
-                            onModificationSubmitted={handleModificationSubmitted}
-                          />
-                        </div>
+                        <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
                       </div>
-                      <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
-                    </div>
-                  ))}
+                    ))}
                 </CardContent>
               </Card>
             )}
@@ -508,91 +508,91 @@ export default function ClientDashboard() {
                 {pendingBookings
                   .slice((pendingPage - 1) * itemsPerPage, pendingPage * itemsPerPage)
                   .map((booking) => {
-                  const daysWaiting = Math.floor(
-                    (new Date().getTime() - new Date(booking.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  const isUrgent = daysWaiting > 2;
-                  
-                  return (
-                    <Card key={booking.id} className={isUrgent ? "border-orange-300 bg-orange-50/30" : ""}>
-                      <CardContent className="p-6">
-                        <div className="space-y-4">
-                          {/* Header */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <Clock className={`w-5 h-5 ${isUrgent ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                    const daysWaiting = Math.floor(
+                      (new Date().getTime() - new Date(booking.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                    );
+                    const isUrgent = daysWaiting > 2;
+
+                    return (
+                      <Card key={booking.id} className={isUrgent ? "border-orange-300 bg-orange-50/30" : ""}>
+                        <CardContent className="p-6">
+                          <div className="space-y-4">
+                            {/* Header */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <Clock className={`w-5 h-5 ${isUrgent ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                                <div>
+                                  <h3 className="font-semibold text-lg">
+                                    {booking.booking_type === 'long_term' ? 'Long-term Care Request' : 'Short-term Booking Request'}
+                                  </h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Requested {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge variant={isUrgent ? "destructive" : "secondary"}>
+                                {isUrgent ? `${daysWaiting} days waiting` : 'Pending'}
+                              </Badge>
+                            </div>
+
+                            {/* Booking Details */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                               <div>
-                                <h3 className="font-semibold text-lg">
-                                  {booking.booking_type === 'long_term' ? 'Long-term Care Request' : 'Short-term Booking Request'}
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                  Requested {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
-                                </p>
+                                <p className="text-xs text-muted-foreground">Start Date</p>
+                                <p className="font-medium">{format(new Date(booking.start_date), 'MMM dd, yyyy')}</p>
+                              </div>
+                              {booking.end_date && (
+                                <div>
+                                  <p className="text-xs text-muted-foreground">End Date</p>
+                                  <p className="font-medium">{format(new Date(booking.end_date), 'MMM dd, yyyy')}</p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                                <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
                               </div>
                             </div>
-                            <Badge variant={isUrgent ? "destructive" : "secondary"}>
-                              {isUrgent ? `${daysWaiting} days waiting` : 'Pending'}
-                            </Badge>
-                          </div>
 
-                          {/* Booking Details */}
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Start Date</p>
-                              <p className="font-medium">{format(new Date(booking.start_date), 'MMM dd, yyyy')}</p>
-                            </div>
-                            {booking.end_date && (
-                              <div>
-                                <p className="text-xs text-muted-foreground">End Date</p>
-                                <p className="font-medium">{format(new Date(booking.end_date), 'MMM dd, yyyy')}</p>
+                            {/* Nanny Info */}
+                            {booking.nannies && (
+                              <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                                <User className="w-8 h-8 text-muted-foreground" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Requested Nanny</p>
+                                  <p className="font-medium">
+                                    {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
+                                  </p>
+                                </div>
                               </div>
                             )}
-                            <div>
-                              <p className="text-xs text-muted-foreground">Monthly Cost</p>
-                              <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
-                            </div>
-                          </div>
 
-                          {/* Nanny Info */}
-                          {booking.nannies && (
-                            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-                              <User className="w-8 h-8 text-muted-foreground" />
-                              <div>
-                                <p className="text-xs text-muted-foreground">Requested Nanny</p>
-                                <p className="font-medium">
-                                  {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Action Buttons */}
-                          <div className="flex gap-2 pt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}
-                            >
-                              View Details
-                            </Button>
-                            {isUrgent && (
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 pt-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-orange-600 border-orange-300"
+                                onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}
                               >
-                                <AlertCircle className="w-4 h-4 mr-2" />
-                                Contact Support
+                                View Details
                               </Button>
-                            )}
+                              {isUrgent && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-orange-600 border-orange-300"
+                                >
+                                  <AlertCircle className="w-4 h-4 mr-2" />
+                                  Contact Support
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
               </div>
-              
+
               {/* Pagination for Pending */}
               {pendingBookings.length > itemsPerPage && (
                 <div className="flex items-center justify-center gap-2 pt-4">
@@ -644,66 +644,66 @@ export default function ClientDashboard() {
                   .filter(b => b.status !== 'pending')
                   .slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage)
                   .map((booking) => (
-                  <Card key={booking.id}>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle className="w-5 h-5 text-primary" />
-                            <div>
-                              <h3 className="font-semibold text-lg">
-                                {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Started {format(new Date(booking.start_date), 'PPP')}
-                              </p>
+                    <Card key={booking.id}>
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <CheckCircle className="w-5 h-5 text-primary" />
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Started {format(new Date(booking.start_date), 'PPP')}
+                                </p>
+                              </div>
                             </div>
+                            <Badge variant="default">{booking.status}</Badge>
                           </div>
-                          <Badge variant="default">{booking.status}</Badge>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Monthly Cost</p>
-                            <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
-                          </div>
-                          {booking.living_arrangement && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <p className="text-xs text-muted-foreground">Arrangement</p>
-                              <p className="font-medium capitalize">{booking.living_arrangement.replace('_', ' ')}</p>
+                              <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                              <p className="font-medium text-lg">R{booking.total_monthly_cost?.toFixed(2)}</p>
+                            </div>
+                            {booking.living_arrangement && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Arrangement</p>
+                                <p className="font-medium capitalize">{booking.living_arrangement.replace('_', ' ')}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {booking.nannies && (
+                            <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-lg">
+                              <User className="w-8 h-8 text-primary" />
+                              <div>
+                                <p className="text-xs text-muted-foreground">Your Nanny</p>
+                                <p className="font-medium">
+                                  {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
+                                </p>
+                              </div>
                             </div>
                           )}
-                        </div>
 
-                        {booking.nannies && (
-                          <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-lg">
-                            <User className="w-8 h-8 text-primary" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Your Nanny</p>
-                              <p className="font-medium">
-                                {booking.nannies.profiles?.first_name} {booking.nannies.profiles?.last_name}
-                              </p>
-                            </div>
+                          <div className="flex gap-2 pt-2">
+                            <BookingModificationDialog
+                              booking={booking}
+                              onModificationSubmitted={handleModificationSubmitted}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}>
+                              View Details
+                            </Button>
                           </div>
-                        )}
 
-                        <div className="flex gap-2 pt-2">
-                          <BookingModificationDialog 
-                            booking={booking} 
-                            onModificationSubmitted={handleModificationSubmitted}
-                          />
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/bookings/${booking.id}`)}>
-                            View Details
-                          </Button>
+                          <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
                         </div>
-
-                        <LazyBookingModificationHistory key={refreshKey} bookingId={booking.id} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
               </div>
-              
+
               {/* Pagination for Active */}
               {activeBookings.filter(b => b.status !== 'pending').length > itemsPerPage && (
                 <div className="flex items-center justify-center gap-2 pt-4">
@@ -763,7 +763,7 @@ export default function ClientDashboard() {
                                     {booking.booking_type === 'long_term' ? 'Long-term Care' : 'Short-term Booking'}
                                   </p>
                                   <p className="text-sm text-muted-foreground">
-                                    {format(new Date(booking.start_date), 'MMM dd')} - 
+                                    {format(new Date(booking.start_date), 'MMM dd')} -
                                     {booking.end_date ? format(new Date(booking.end_date), 'MMM dd, yyyy') : 'Ongoing'}
                                   </p>
                                 </div>
@@ -780,8 +780,8 @@ export default function ClientDashboard() {
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold">Cancelled Bookings</h3>
                     {cancelledBookings
-                      .slice(completedBookings.length > 0 ? 0 : (historyPage - 1) * itemsPerPage, 
-                             completedBookings.length > 0 ? cancelledBookings.length : historyPage * itemsPerPage)
+                      .slice(completedBookings.length > 0 ? 0 : (historyPage - 1) * itemsPerPage,
+                        completedBookings.length > 0 ? cancelledBookings.length : historyPage * itemsPerPage)
                       .map((booking) => (
                         <Card key={booking.id}>
                           <CardContent className="p-4">
@@ -838,7 +838,7 @@ export default function ClientDashboard() {
 
 
       {/* Recent Activity */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg md:text-xl">Recent Activity</CardTitle>

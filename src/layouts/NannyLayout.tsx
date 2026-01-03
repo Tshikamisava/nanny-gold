@@ -50,7 +50,7 @@ export const NannyLayout = () => {
     <SidebarProvider>
       <div className="h-screen w-full flex overflow-hidden">
         <NannySidebar />
-        
+
         <div className="flex-1 flex flex-col h-screen">
           {/* Header - Fixed */}
           <header className="h-16 border-b bg-background flex items-center justify-between px-4 md:px-6 flex-shrink-0">
@@ -58,13 +58,13 @@ export const NannyLayout = () => {
               <SidebarTrigger className="lg:hidden" />
               <h1 className="text-lg md:text-xl font-semibold">Nanny Dashboard</h1>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* Chat Icon */}
               <Button variant="ghost" size="icon" className="relative" onClick={() => navigate('/dashboard/messages')}>
                 <MessageCircle className="h-5 w-5" />
               </Button>
-              
+
               {/* Notification Bell */}
               <Button variant="ghost" size="icon" className="relative" onClick={() => navigate('/nanny/notifications-inbox')}>
                 <Bell className="h-5 w-5" />
@@ -74,7 +74,7 @@ export const NannyLayout = () => {
                   </Badge>
                 )}
               </Button>
-              
+
               {/* Profile Avatar with Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -115,11 +115,11 @@ export const NannyLayout = () => {
 
           {/* Main Content - Scrollable */}
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
+            <div className="p-2 sm:p-3 md:p-4 max-w-7xl mx-auto">
               <Outlet />
             </div>
           </main>
-          
+
           {/* Footer - Fixed */}
           <div className="flex-shrink-0">
             <Footer />
