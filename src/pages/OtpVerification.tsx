@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { Heart, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserTenantRoute } from '@/utils/userUtils';
 
 const OtpVerification = () => {
   const navigate = useNavigate();
@@ -82,7 +83,7 @@ const OtpVerification = () => {
             first_name: signupData.name.split(' ')[0],
             last_name: signupData.name.split(' ').slice(1).join(' ') || '',
             phone: signupData.phone,
-            user_type: 'client',
+            user_type: signupData.userType || 'client',
             password: signupData.password
           }
         }
@@ -128,7 +129,11 @@ const OtpVerification = () => {
         title: "Account Created!",
         description: "Your account has been successfully created",
       });
-      navigate('/client/profile-settings');
+
+      // Redirect based on user type
+      const userType = signupData.userType || 'client';
+      const route = getUserTenantRoute(userType);
+      navigate(route);
     } catch (error: any) {
       toast({
         title: "Error",

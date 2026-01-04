@@ -311,8 +311,8 @@ export default function EnhancedSignup() {
                       <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="client">Chief of Home seeking family support</SelectItem>
-                      <SelectItem value="nanny">Family Support Specialist offering family support</SelectItem>
+                      <SelectItem value="client">Client (Seeking family support)</SelectItem>
+                      <SelectItem value="nanny">Nanny (Offering family support)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

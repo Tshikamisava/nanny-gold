@@ -37,15 +37,20 @@ export const Footer = () => {
           </div>
 
           {/* Contact */}
-          <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
-            <a href="mailto:support@nannygold.com" className="flex items-center gap-1 hover:text-primary transition-colors">
-              <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">support@nannygold.com</span>
-            </a>
-            <a href="tel:+27123456789" className="flex items-center gap-1 hover:text-primary transition-colors">
-              <Phone className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">+27 12 345 6789</span>
-            </a>
+          <div className="flex flex-col items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <a href="mailto:care@nannygold.co.za" className="flex items-center gap-1 hover:text-primary transition-colors">
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">care@nannygold.co.za</span>
+              </a>
+              <a href="tel:+27662733942" className="flex items-center gap-1 hover:text-primary transition-colors">
+                <Phone className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">+27 66 273 3942</span>
+              </a>
+            </div>
+            <div className="text-center text-[10px] sm:text-xs">
+              Johannesburg, South Africa
+            </div>
           </div>
         </div>
 
