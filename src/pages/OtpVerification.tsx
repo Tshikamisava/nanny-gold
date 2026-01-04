@@ -2,20 +2,52 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, ArrowLeft } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const OtpVerification = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signUp } = useAuth();
   const { toast } = useToast();
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
-  
-  const { email, password, name, phone, expectedOtp } = location.state || {};
+
+  // Parse query parameters from URL
+  const queryParams = new URLSearchParams(location.search);
+  const email = queryParams.get('email') || '';
+
+  // Get signup data from sessionStorage
+  const [signupData, setSignupData] = useState<any>(null);
+
+  // Retrieve signup data from sessionStorage on mount
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('signupData');
+    if (storedData) {
+      const data = JSON.parse(storedData);
+      setSignupData(data);
+    } else {
+      toast({
+        title: "Missing Information",
+        description: "Please complete the signup process again",
+        variant: "destructive"
+      });
+      navigate('/signup');
+    }
+  }, [navigate, toast]);
+
+  // Redirect if email doesn't match
+  useEffect(() => {
+    if (signupData && signupData.email !== email) {
+      toast({
+        title: "Invalid Session",
+        description: "Please complete the signup process again",
+        variant: "destructive"
+      });
+      navigate('/signup');
+    }
+  }, [signupData, email, navigate, toast]);
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) {
@@ -27,42 +59,80 @@ const OtpVerification = () => {
       return;
     }
 
-    if (otp !== expectedOtp) {
+    if (!signupData) {
       toast({
-        title: "Invalid OTP",
-        description: "The verification code is incorrect",
+        title: "Session Expired",
+        description: "Please complete the signup process again",
         variant: "destructive"
       });
+      navigate('/signup');
       return;
     }
 
     setIsVerifying(true);
-    
+
     try {
-      const { data, error } = await signUp(email, password, {
-        first_name: name.split(' ')[0],
-        last_name: name.split(' ').slice(1).join(' ') || '',
-        phone: phone,
-        user_type: 'client'
+      // Call the verify-email-otp function
+      const { data, error } = await supabase.functions.invoke('verify-email-otp', {
+        body: {
+          email: email.toLowerCase().trim(),
+          otp: otp,
+          purpose: 'signup',
+          userData: {
+            first_name: signupData.name.split(' ')[0],
+            last_name: signupData.name.split(' ').slice(1).join(' ') || '',
+            phone: signupData.phone,
+            user_type: 'client',
+            password: signupData.password
+          }
+        }
       });
 
-      if (error) {
+      console.log('OTP verification response:', { data, error });
+
+      if (error || !data?.success) {
+        // Detailed error logging as requested
+        const functionsError = error as any;
+        console.error("--- EDGE FUNCTION ERROR DEBUG ---");
+        console.error("Status:", functionsError?.status || functionsError?.context?.status);
+        console.error("Message:", functionsError?.message);
+        const details = functionsError?.details || functionsError?.context?.details || functionsError?.context;
+        console.error("Details:", details);
+        console.error("Data Error:", data?.error);
+        console.error("---------------------------------");
+
+        let errorMessage = data?.error || "The verification code is incorrect or has expired";
+
+        if (error?.message) {
+          if (error.message.includes("already exists")) {
+            errorMessage = "An account with this email already exists. Please try logging in instead.";
+          } else if (error.message.includes("Password must be at least 8 characters")) {
+            errorMessage = "Password validation failed. Please restart the signup process.";
+          } else if (error.message !== "Edge Function returned a non-2xx status code") {
+            errorMessage = error.message;
+          }
+        }
+
         toast({
-          title: "Registration Failed",
-          description: error.message,
+          title: "Verification Failed",
+          description: errorMessage,
           variant: "destructive"
         });
-      } else {
-        toast({
-          title: "Account Created!",
-          description: "Your account has been successfully created",
-        });
-        navigate('/client/profile-settings');
+        return;
       }
-    } catch (error) {
+
+      // Clear sessionStorage on successful verification
+      sessionStorage.removeItem('signupData');
+
+      toast({
+        title: "Account Created!",
+        description: "Your account has been successfully created",
+      });
+      navigate('/client/profile-settings');
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: error.message || "An unexpected error occurred",
         variant: "destructive"
       });
     } finally {
@@ -71,11 +141,45 @@ const OtpVerification = () => {
   };
 
   const handleResendOtp = async () => {
-    // In a real implementation, you'd call the send-otp function again
-    toast({
-      title: "OTP Resent",
-      description: "A new verification code has been sent to your email",
-    });
+    if (!signupData) {
+      toast({
+        title: "Session Expired",
+        description: "Please complete the signup process again",
+        variant: "destructive"
+      });
+      navigate('/signup');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: {
+          email: email.toLowerCase().trim(),
+          name: signupData.name.split(' ')[0],
+          purpose: 'signup'
+        }
+      });
+
+      if (error || !data?.success) {
+        toast({
+          title: "Failed to Resend",
+          description: error?.message || "Could not send a new verification code",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "OTP Resent",
+        description: "A new verification code has been sent to your email",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend verification code",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -119,19 +223,19 @@ const OtpVerification = () => {
                 </InputOTPGroup>
               </InputOTP>
             </div>
-            
-            <Button 
-              onClick={handleVerifyOtp} 
+
+            <Button
+              onClick={handleVerifyOtp}
               disabled={isVerifying || otp.length !== 6}
               className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-xl font-semibold"
             >
               {isVerifying ? "Verifying..." : "Verify & Create Account"}
             </Button>
-            
+
             <div className="text-center space-y-2">
               <p className="text-sm text-muted-foreground">Didn't receive the code?</p>
-              <Button 
-                variant="link" 
+              <Button
+                variant="link"
                 onClick={handleResendOtp}
                 className="text-primary p-0 hover:text-primary/80"
               >

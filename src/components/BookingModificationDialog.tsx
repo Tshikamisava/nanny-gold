@@ -180,9 +180,10 @@ export const BookingModificationDialog: React.FC<BookingModificationDialogProps>
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Edit className="h-4 w-4" />
-          Modify Booking
+        <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap shrink-0">
+          <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden xs:inline">Modify Booking</span>
+          <span className="xs:hidden">Modify</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
