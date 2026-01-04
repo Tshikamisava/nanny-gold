@@ -73,17 +73,27 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        // Basic file size check (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds the 10MB limit.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
         // Get authenticated user
         const { data: user } = await supabase.auth.getUser();
         if (!user.user) throw new Error('User not authenticated');
-        
+
         // Use targetUserId for admin context, otherwise use current user
         const userId = targetUserId || user.user.id;
-        
+
         // Upload to Supabase storage with proper folder structure
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
           .upload(`${userId}/${fileName}`, file);
@@ -107,7 +117,12 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
           .select()
           .single();
 
-        if (docError) throw docError;
+        if (docError) {
+          console.error('Database insert error:', docError);
+          throw docError;
+        }
+
+        if (!docData) throw new Error('Failed to save document record');
 
         // Add to local state
         const newDoc: UploadedDocument = {
@@ -129,15 +144,15 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
 
       toast({
         title: "Documents uploaded successfully",
-        description: isAdminView 
+        description: isAdminView
           ? "Documents uploaded for nanny. You can now approve or reject them."
           : "Your documents are being processed. You'll be notified once verified.",
       });
-    } catch (error) {
-      console.error('Upload error:', error);
+    } catch (error: any) {
+      console.error('Upload error details:', error);
       toast({
         title: "Upload failed",
-        description: "Please try again or contact support.",
+        description: error.message || "Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
@@ -147,28 +162,36 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
 
   const detectDocumentType = (filename: string): string => {
     const lower = filename.toLowerCase();
-    
-    // Enhanced passport and immigration detection (priority for foreign nannies)
-    if (lower.includes('passport') || lower.includes('immigration') || lower.includes('permit') || 
-        lower.includes('visa') || lower.includes('asylum') || lower.includes('id') || 
-        lower.includes('identity')) {
+
+    // ID Document detection - matches 'id_document' in DB constraint
+    if (lower.includes('passport') || lower.includes('id_') || lower.includes('identity') ||
+      lower.includes('identification') || (lower.includes('id') && lower.split(/[._-]/).includes('id'))) {
       return 'id_document';
     }
-    
-    // Criminal/background check documents
-    if (lower.includes('criminal') || lower.includes('background') || lower.includes('police') || 
-        lower.includes('clearance')) {
-      return 'criminal_check';
-    }
-    
-    // Reference letters, CVs, employment documents
-    if (lower.includes('cv') || lower.includes('resume') || lower.includes('reference') || 
-        lower.includes('letter') || lower.includes('recommendation')) {
+
+    // CV/Resume/Reference detection - matches 'reference_letter' in DB constraint
+    if (lower.includes('cv') || lower.includes('resume') || lower.includes('curriculum') ||
+      lower.includes('reference') || lower.includes('letter') || lower.includes('recommendation')) {
       return 'reference_letter';
     }
-    
-    // Certifications and qualifications (fallback for most other documents)
-    return 'certification';
+
+    // Criminal/background check documents - matches 'criminal_check' in DB constraint
+    if (lower.includes('criminal') || lower.includes('background') || lower.includes('police') ||
+      lower.includes('clearance')) {
+      return 'criminal_check';
+    }
+
+    // Immigration documents - map to 'id_document' as they serve a similar purpose
+    if (lower.includes('permit') || lower.includes('visa') || lower.includes('asylum') || lower.includes('immigration')) {
+      return 'id_document';
+    }
+
+    // Certifications and qualifications - matches 'certification' in DB constraint
+    if (lower.includes('cert') || lower.includes('qualification') || lower.includes('diploma') || lower.includes('degree')) {
+      return 'certification';
+    }
+
+    return 'certification'; // Fallback to 'certification' as it's the safest generic type in the DB list
   };
 
   const extractTitleFromFilename = (filename: string): string => {
@@ -177,6 +200,32 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
     title = title.replace(/^(certificate|cert|diploma)_?/i, '');
     title = title.replace(/_/g, ' ');
     return title.charAt(0).toUpperCase() + title.slice(1);
+  };
+
+  const getDocTypeLabel = (type: string, name: string) => {
+    const lowerName = name.toLowerCase();
+
+    if (type === 'reference_letter') {
+      if (lowerName.includes('cv') || lowerName.includes('resume') || lowerName.includes('curriculum')) {
+        return 'CV / Resume';
+      }
+      return 'Reference Letter';
+    }
+
+    if (type === 'id_document') {
+      if (lowerName.includes('passport')) return 'Passport';
+      if (lowerName.includes('permit')) return 'Work Permit';
+      if (lowerName.includes('visa')) return 'Visa';
+      if (lowerName.includes('asylum')) return 'Asylum Document';
+      return 'ID Document';
+    }
+
+    if (type === 'criminal_check') return 'Criminal Record Check';
+    if (type === 'certification') return 'Certification';
+    if (type === 'bank_details') return 'Bank Details';
+    if (type === 'medical_certificate') return 'Medical Certificate';
+
+    return type.replace('_', ' ').charAt(0).toUpperCase() + type.replace('_', ' ').slice(1);
   };
 
   const handleEmailSupport = () => {
@@ -200,7 +249,7 @@ Please let me know how I can send these documents securely.
 Thank you for your assistance.
 
 Best regards`);
-    
+
     window.location.href = `mailto:care@nannygold.co.za?subject=${subject}&body=${body}`;
   };
 
@@ -210,7 +259,7 @@ Best regards`);
         .from('nanny_documents')
         .delete()
         .eq('id', docId);
-      
+
       setDocuments(prev => prev.filter(doc => doc.id !== docId));
       toast({
         title: "Document removed",
@@ -239,7 +288,7 @@ Best regards`);
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileUpload(e.dataTransfer.files);
     }
@@ -260,11 +309,11 @@ Best regards`);
         .from('nanny_documents')
         .update({ verification_status: 'verified' })
         .eq('id', docId);
-      
-      setDocuments(prev => prev.map(doc => 
+
+      setDocuments(prev => prev.map(doc =>
         doc.id === docId ? { ...doc, status: 'approved' } : doc
       ));
-      
+
       toast({
         title: "Document approved",
         description: "The document has been approved successfully.",
@@ -284,11 +333,11 @@ Best regards`);
         .from('nanny_documents')
         .update({ verification_status: 'rejected' })
         .eq('id', docId);
-      
-      setDocuments(prev => prev.map(doc => 
+
+      setDocuments(prev => prev.map(doc =>
         doc.id === docId ? { ...doc, status: 'rejected' } : doc
       ));
-      
+
       toast({
         title: "Document rejected",
         description: "The document has been rejected and the nanny will be notified.",
@@ -310,18 +359,38 @@ Best regards`);
           Upload Documents
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Upload your passport, ID, permits, visa, asylum documents, certifications, and reference letters. Documents will be automatically categorized and verified.
+          Upload your passport, ID, <strong>CV/Resume</strong>, certifications, and reference letters. Documents are automatically categorized.
         </p>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-3 bg-fuchsia-50/50 border border-fuchsia-100 rounded-lg">
+            <h4 className="text-xs font-semibold text-fuchsia-900 uppercase tracking-wider mb-2">Required for Profile</h4>
+            <ul className="space-y-1">
+              <li className="flex items-center text-xs text-fuchsia-800">
+                <CheckCircle className={`w-3 h-3 mr-2 ${documents.some(d => d.type === 'id_document') ? 'text-green-500' : 'text-fuchsia-300'}`} />
+                ID / Passport / Permit
+              </li>
+              <li className="flex items-center text-xs text-fuchsia-800">
+                <CheckCircle className={`w-3 h-3 mr-2 ${documents.some(d => d.type === 'reference_letter' && (d.name.toLowerCase().includes('cv') || d.name.toLowerCase().includes('resume'))) ? 'text-green-500' : 'text-fuchsia-300'}`} />
+                CV / Resume
+              </li>
+            </ul>
+          </div>
+          <div className="p-3 bg-muted/30 border border-muted-foreground/10 rounded-lg">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Flexible Upload</h4>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              You can upload files 1-by-1 as you get them, or all at once. Click "Choose Files" or drag them into the box below.
+            </p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
           {/* Upload Area */}
-          <div 
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              dragActive 
-                ? 'border-primary bg-primary/5' 
-                : 'border-muted-foreground/25'
-            }`}
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive
+              ? 'border-primary bg-primary/5'
+              : 'border-muted-foreground/25'
+              }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -344,8 +413,8 @@ Best regards`);
                 className="hidden"
                 disabled={uploading}
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 disabled={uploading}
                 className="mt-2"
                 onClick={() => fileInputRef.current?.click()}
@@ -382,8 +451,8 @@ Best regards`);
                         {doc.extractedTitle || doc.name}
                       </p>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {doc.type}
+                        <Badge variant="outline" className="text-xs bg-white">
+                          {getDocTypeLabel(doc.type, doc.name)}
                         </Badge>
                         {doc.status === 'pending' && (
                           <Badge variant="secondary" className="text-xs">

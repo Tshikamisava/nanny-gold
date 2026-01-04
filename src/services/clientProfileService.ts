@@ -122,76 +122,152 @@ export const saveClientProfile = async (
     
     console.log('🧹 Cleaned profile data:', cleanedData);
 
-    // Call transaction edge function for atomic save
+    // Get auth session
     const { data: authData } = await supabase.auth.getSession();
     if (!authData.session) {
       throw new Error('Not authenticated');
     }
 
-    console.log('🔐 Calling transaction edge function...');
-    
-    const { data, error } = await supabase.functions.invoke('save-client-profile-transaction', {
-      body: { profileData: cleanedData },
-      headers: {
-        Authorization: `Bearer ${authData.session.access_token}`
-      }
-    });
+    console.log('🔐 Using direct database saves...');
 
-    if (error) {
-      console.error('❌ Transaction edge function error:', error);
-      throw new Error(error.message || 'Failed to save profile');
-    }
-
-    if (!data?.success) {
-      console.error('❌ Transaction failed:', data?.error);
-      throw new Error(data?.error?.userMessage || 'Failed to save profile');
-    }
-
-    console.log('✅ Profile saved successfully via transaction');
-    console.log('📊 Saved data:', data.savedData);
-    
-    // Cache the saved profile data
-    if (data.savedData) {
-      // Reconstruct profile data from saved data for caching
-      const profileToCache: ClientProfileData = {
-        location: cleanedData.location,
-        streetAddress: cleanedData.streetAddress,
-        estateInfo: cleanedData.estateInfo,
-        suburb: cleanedData.suburb,
-        city: cleanedData.city,
-        province: cleanedData.province,
-        postalCode: cleanedData.postalCode,
-        firstName: cleanedData.firstName,
-        lastName: cleanedData.lastName,
-        phone: cleanedData.phone,
-        numberOfChildren: cleanedData.numberOfChildren,
-        childrenAges: cleanedData.childrenAges,
-        otherDependents: cleanedData.otherDependents,
-        petsInHome: cleanedData.petsInHome,
-        homeSize: cleanedData.homeSize,
-        specialNeeds: cleanedData.specialNeeds,
-        ecdTraining: cleanedData.ecdTraining,
-        drivingSupport: cleanedData.drivingSupport,
-        cooking: cleanedData.cooking,
-        lightHouseKeeping: cleanedData.lightHouseKeeping,
-        errandRuns: cleanedData.errandRuns,
-        languages: cleanedData.languages,
-        montessori: cleanedData.montessori,
-        schedule: cleanedData.schedule,
-        backupNanny: cleanedData.backupNanny,
-        livingArrangement: cleanedData.livingArrangement,
-        durationType: cleanedData.durationType,
-        bookingSubType: cleanedData.bookingSubType,
-        selectedDates: cleanedData.selectedDates,
-        timeSlots: cleanedData.timeSlots,
-      };
-      cacheProfile(userId, profileToCache);
-    }
-    
-    return { 
-      success: true,
-      savedData: data.savedData
+    // Build address JSON object
+    const addressJson = {
+      street: cleanedData.streetAddress || '',
+      estate: cleanedData.estateInfo || '',
+      suburb: cleanedData.suburb || '',
+      city: cleanedData.city || '',
+      province: cleanedData.province || '',
+      postal: cleanedData.postalCode || ''
     };
+
+    // Check if address has any non-empty values
+    const hasAddressData = Object.values(addressJson).some(val => val && val.trim() !== '');
+
+    // Direct database saves without edge functions
+    try {
+      // 1. Update profiles table
+      const profileUpdates: Record<string, any> = {
+        updated_at: new Date().toISOString()
+      };
+
+      // Fetch current profile to compare phone number
+      const { data: currentProfileData, error: fetchProfileError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+
+      if (fetchProfileError) {
+        console.error('❌ Failed to fetch current profile:', fetchProfileError);
+        throw new Error(`Failed to fetch current profile: ${fetchProfileError.message}`);
+      }
+      const currentPhone = currentProfileData?.phone;
+
+      // Only update location if there's actual address data
+      if (hasAddressData) {
+        profileUpdates.location = JSON.stringify(addressJson);
+        console.log('📍 Updating location with address data:', addressJson);
+      }
+      
+      // Only include personal details if they have actual values
+      if (cleanedData.firstName && cleanedData.firstName.trim() !== '') {
+        profileUpdates.first_name = cleanedData.firstName;
+      }
+      if (cleanedData.lastName && cleanedData.lastName.trim() !== '') {
+        profileUpdates.last_name = cleanedData.lastName;
+      }
+      if (cleanedData.phone && cleanedData.phone.trim() !== '') {
+        // Sanitize phone: remove all spaces and special chars except leading +
+        const sanitizedPhone = cleanedData.phone.replace(/\s+/g, '').trim();
+        
+        // Only update phone if it's different from the current one
+        if (sanitizedPhone !== currentPhone) {
+          // Validate format: must be +27XXXXXXXXX or 0XXXXXXXXX (10 digits total)
+          if (/^(\+27|0)[0-9]{9}$/.test(sanitizedPhone)) {
+            profileUpdates.phone = sanitizedPhone;
+          } else {
+            console.error('❌ Invalid phone format:', cleanedData.phone, '→', sanitizedPhone);
+            throw new Error(`Invalid phone format: ${cleanedData.phone}. Must be 10 digits starting with 0 or +27.`);
+          }
+        } else {
+          console.log('📞 Phone number is unchanged, skipping update.');
+        }
+      }
+      
+      console.log('📝 Profile updates being applied:', Object.keys(profileUpdates));
+      
+      const { error: profilesError } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', userId);
+
+      if (profilesError) {
+        console.error('❌ Profiles update failed:', profilesError);
+        // Check for unique constraint violation specifically for phone number
+        if (profilesError.code === '23505' && profilesError.message.includes('unique_phone')) {
+          throw new Error('This phone number is already registered to another account. Please use a different one or contact support.');
+        } else {
+          throw new Error(`Profiles update failed: ${profilesError.message}`);
+        }
+      }
+      console.log('✅ Profiles table updated');
+
+      // 2. Update clients table
+      const { error: clientsError } = await supabase
+        .from('clients')
+        .update({
+          children_ages: cleanedData.childrenAges || [],
+          other_dependents: cleanedData.otherDependents || 0,
+          pets_in_home: cleanedData.petsInHome || null,
+          home_size: cleanedData.homeSize || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (clientsError) {
+        console.error('❌ Clients update failed:', clientsError);
+        throw new Error(`Clients update failed: ${clientsError.message}`);
+      }
+      console.log('✅ Clients table updated');
+
+      // 3. Update client_preferences table (upsert to handle first-time users)
+      const preferencesData = {
+        client_id: userId,
+        special_needs: cleanedData.specialNeeds || false,
+        ecd_training: cleanedData.ecdTraining || false,
+        driving_support: cleanedData.drivingSupport || false,
+        cooking: cleanedData.cooking || false,
+        languages: cleanedData.languages || null,
+        montessori: cleanedData.montessori || false,
+        schedule: cleanedData.schedule || {},
+        backup_nanny: cleanedData.backupNanny || false,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: preferencesError } = await supabase
+        .from('client_preferences')
+        .upsert(preferencesData, { onConflict: 'client_id' });
+
+      if (preferencesError) {
+        console.error('❌ Preferences update failed:', preferencesError);
+        throw new Error(`Preferences update failed: ${preferencesError.message}`);
+      }
+      console.log('✅ Preferences table updated');
+
+      console.log('🎉 Profile saved successfully');
+      
+      // Cache the saved profile data
+      cacheProfile(userId, cleanedData);
+      
+      return { 
+        success: true,
+        savedData: cleanedData
+      };
+      
+    } catch (dbError: any) {
+      console.error('❌ Database save failed:', dbError);
+      throw new Error(dbError?.message || 'Failed to save profile to database');
+    }
     
   } catch (error: any) {
     console.error('❌ saveClientProfile: Critical error occurred:', error);
