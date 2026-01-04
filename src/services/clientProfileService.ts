@@ -12,6 +12,7 @@ export interface ClientProfileData {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  avatar_url?: string;
   numberOfChildren?: number;
   childrenAges: string[];
   otherDependents?: number;
@@ -458,6 +459,7 @@ export const loadClientProfile = async (userId: string): Promise<ClientProfileDa
       firstName: profileData?.first_name || "",
       lastName: profileData?.last_name || "",
       phone: profileData?.phone || "",
+      avatar_url: (profileData as any)?.avatar_url || "",
       numberOfChildren: clientData?.number_of_children || 0,
       childrenAges: childrenAges.length > 0 ? childrenAges : [''],
       otherDependents: clientData?.other_dependents || 0,

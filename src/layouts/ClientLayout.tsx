@@ -10,6 +10,7 @@ import { Footer } from '@/components/Footer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useClientProfile } from '@/hooks/useClientProfile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ export const ClientLayout = () => {
   const { signOut, user } = useAuthContext();
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
+  const { profile } = useClientProfile();
   const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   const handleSignOut = async () => {
@@ -78,7 +80,14 @@ export const ClientLayout = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary hover:border-primary/80 transition-colors">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarImage 
+                      src={profile?.avatar_url || user?.user_metadata?.avatar_url} 
+                      onError={(e) => {
+                        console.log('❌ Avatar image failed to load:', e.currentTarget.src);
+                        // Fallback to user initials if image fails to load
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground">{userInitials}</AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
@@ -86,7 +95,7 @@ export const ClientLayout = () => {
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                        {profile?.firstName || user?.user_metadata?.first_name} {profile?.lastName || user?.user_metadata?.last_name}
                       </p>
                       <p className="text-xs leading-none text-muted-foreground">
                         {user?.email}

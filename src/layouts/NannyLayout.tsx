@@ -79,7 +79,14 @@ export const NannyLayout = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary hover:border-primary/80 transition-colors">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarImage 
+                      src={user?.user_metadata?.avatar_url} 
+                      onError={(e) => {
+                        console.log('❌ Nanny avatar image failed to load:', e.currentTarget.src);
+                        // Fallback to user initials if image fails to load
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground">{userInitials}</AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
