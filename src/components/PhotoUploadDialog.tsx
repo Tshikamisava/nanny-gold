@@ -151,18 +151,55 @@ export default function PhotoUploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      // Get public URL with fallback
+      let publicUrl = '';
+      try {
+        const { data } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+        publicUrl = data.publicUrl;
+      } catch (urlError) {
+        console.error('❌ Failed to get public URL:', urlError);
+        // Fallback: construct URL manually
+        const supabaseUrl = 'https://msawldkygbsipjmjuyue.supabase.co';
+        publicUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${filePath}`;
+      }
 
-      // Don't update profile directly - let the parent component handle it via callback
-      // This avoids RLS issues and allows the parent to use Edge Function if needed
+      console.log('📸 Upload successful, public URL:', publicUrl);
+      console.log('📁 File path:', filePath);
+
+      if (!publicUrl) {
+        throw new Error('Failed to generate public URL for uploaded image');
+      }
+
+      // Test if the URL is accessible
+      try {
+        const response = await fetch(publicUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          console.warn('⚠️ Uploaded image URL is not accessible:', response.status);
+        }
+      } catch (fetchError) {
+        console.warn('⚠️ Could not test image URL accessibility:', fetchError);
+      }
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('❌ Failed to update profile with avatar URL:', updateError);
+        throw new Error(`Failed to update profile: ${updateError.message}`);
+      }
+
+      console.log('✅ Profile updated with avatar URL');
+
       onPhotoUploaded(publicUrl);
       onOpenChange(false);
       toast({
         title: "Photo uploaded successfully",
-        description: "Your profile photo has been updated!"
+        description: "Your profile photo has been updated! It may take a moment to appear.",
       });
 
       // Cleanup
@@ -212,12 +249,10 @@ export default function PhotoUploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="w-5 h-5" />
-            Upload Profile Photo
-          </DialogTitle>
+      <DialogContent className="sm:max-w-lg max-w-[95vw] mx-4">
+        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+          <Camera className="w-5 h-5 flex-shrink-0" />
+          <DialogTitle className="text-lg sm:text-xl">Upload Profile Photo</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -261,7 +296,7 @@ export default function PhotoUploadDialog({
           {previewUrl && (
             <div className="space-y-4">
               <div className="flex justify-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-border">
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-border">
                   <img
                     src={previewUrl}
                     alt="Preview"
@@ -271,11 +306,11 @@ export default function PhotoUploadDialog({
               </div>
 
               {/* Validation Results */}
-              <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-3 p-3 sm:p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium text-sm">Photo Validation</h4>
                 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4" />
                       <span className="text-sm">Head & shoulders visible</span>
@@ -283,7 +318,7 @@ export default function PhotoUploadDialog({
                     <ValidationIcon result={validationResults.hasHeadShoulders} />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                     <div className="flex items-center gap-2">
                       <Smile className="w-4 h-4" />
                       <span className="text-sm">Smiling expression</span>
@@ -291,7 +326,7 @@ export default function PhotoUploadDialog({
                     <ValidationIcon result={validationResults.hasSmile} />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                     <div className="flex items-center gap-2">
                       <Camera className="w-4 h-4" />
                       <span className="text-sm">Image quality (400x400+)</span>
@@ -315,18 +350,18 @@ export default function PhotoUploadDialog({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1"
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               onClick={handleUpload}
               disabled={!selectedFile || !allValidationsPassed || validationInProgress || uploading}
-              className="flex-1"
+              className="w-full sm:w-auto"
             >
               {uploading ? (
                 <>

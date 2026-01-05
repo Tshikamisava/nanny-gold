@@ -16,6 +16,7 @@ export const Footer = () => {
             </h3>
           </div>
 
+
           {/* Contact */}
           <div className="flex flex-col items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-2 sm:gap-3">
