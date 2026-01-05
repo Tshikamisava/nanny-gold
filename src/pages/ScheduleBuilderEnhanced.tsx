@@ -225,7 +225,7 @@ const ScheduleBuilder = () => {
                 type="time" 
                 value={startTime} 
                 onChange={e => setStartTime(e.target.value)} 
-                className="w-full p-3 border border-fuchsia-200 rounded-lg focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" 
+                className="w-full p-3 border border-primary/20 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20" 
                 min="06:00" 
                 max="20:00" 
               />
@@ -251,7 +251,7 @@ const ScheduleBuilder = () => {
                     value="3-in-1-out" 
                     checked={breakPreference === '3-in-1-out'} 
                     onChange={e => setBreakPreference(e.target.value)} 
-                    className="w-4 h-4 text-fuchsia-600 border-fuchsia-300 focus:ring-fuchsia-500" 
+                    className="w-4 h-4 text-primary border-primary/30 focus:ring-primary" 
                   />
                   <span className="ml-3 text-sm text-fuchsia-900">3 weekends in, 1 weekend out</span>
                 </label>
@@ -263,7 +263,7 @@ const ScheduleBuilder = () => {
                     value="2-in-2-out" 
                     checked={breakPreference === '2-in-2-out'} 
                     onChange={e => setBreakPreference(e.target.value)} 
-                    className="w-4 h-4 text-fuchsia-600 border-fuchsia-300 focus:ring-fuchsia-500" 
+                    className="w-4 h-4 text-primary border-primary/30 focus:ring-primary" 
                   />
                   <span className="ml-3 text-sm text-fuchsia-900">2 weekends in, 2 weekends out</span>
                 </label>
@@ -275,7 +275,7 @@ const ScheduleBuilder = () => {
                     value="1-in-3-out" 
                     checked={breakPreference === '1-in-3-out'} 
                     onChange={e => setBreakPreference(e.target.value)} 
-                    className="w-4 h-4 text-fuchsia-600 border-fuchsia-300 focus:ring-fuchsia-500" 
+                    className="w-4 h-4 text-primary border-primary/30 focus:ring-primary" 
                   />
                   <span className="ml-3 text-sm text-fuchsia-900">1 weekend in, 3 weekends out</span>
                 </label>
@@ -287,7 +287,7 @@ const ScheduleBuilder = () => {
                     value="all-weekends-out" 
                     checked={breakPreference === 'all-weekends-out'} 
                     onChange={e => setBreakPreference(e.target.value)} 
-                    className="w-4 h-4 text-fuchsia-600 border-fuchsia-300 focus:ring-fuchsia-500" 
+                    className="w-4 h-4 text-primary border-primary/30 focus:ring-primary" 
                   />
                   <span className="ml-3 text-sm text-fuchsia-900">All weekends out</span>
                 </label>
@@ -305,7 +305,7 @@ const ScheduleBuilder = () => {
                   className="w-full p-3 border border-fuchsia-200 rounded-lg focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 min-h-[80px] resize-none text-sm"
                   rows={3}
                 />
-                <p className="text-xs text-fuchsia-600 mt-2">
+                <p className="text-xs text-primary mt-2">
                   Let us know if you have specific break scheduling needs that don't fit the standard options above.
                 </p>
               </div>
@@ -368,7 +368,7 @@ const ScheduleBuilder = () => {
               <Button 
                 variant="outline" 
                 onClick={addTimeSlot} 
-                className="w-full border-fuchsia-300 text-fuchsia-600 hover:bg-fuchsia-50"
+                className="w-full border-primary/30 text-primary hover:bg-primary/10"
               >
                 Add Time Slot
               </Button>
@@ -385,7 +385,7 @@ const ScheduleBuilder = () => {
         <Button 
           onClick={handleSubmit} 
           disabled={selectedDates.length === 0 || (isEmergencyBooking && timeSlots.length === 0)} 
-          className="w-full mt-6 py-4 text-lg font-semibold rounded-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white disabled:opacity-50"
+          className="w-full mt-6 py-4 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-white disabled:opacity-50"
         >
           {isEmergencyBooking ? "Confirm Emergency Booking" : "Save"}
         </Button>

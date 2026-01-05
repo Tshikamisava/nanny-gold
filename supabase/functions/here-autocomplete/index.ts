@@ -162,11 +162,11 @@ serve(async (req) => {
     url.searchParams.set('dedupe', '1')
     url.searchParams.set('accept-language', 'en')
 
-    // If proximity passed, bias results to user's vicinity using a small bounding box
+    // If proximity passed, bias results to user's vicinity using a smaller bounding box
     if (proximity && typeof proximity.lat === 'number' && typeof proximity.lng === 'number') {
       const lat = Number(proximity.lat)
       const lon = Number(proximity.lng)
-      const delta = 0.35 // ~35km radius
+      const delta = 0.15 // ~15km radius (reduced from 35km for better proximity)
       const viewbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`
       url.searchParams.set('viewbox', viewbox)
       url.searchParams.set('bounded', '1')
@@ -184,7 +184,7 @@ serve(async (req) => {
     const results = await response.json()
 
     // Normalize to the HERE-like shape expected by the frontend: { items: [...] }
-    const items = Array.isArray(results) ? results.map((item: any) => {
+    let items = Array.isArray(results) ? results.map((item: any) => {
       const lat = parseFloat(String(item.lat))
       const lon = parseFloat(String(item.lon))
       const addr = item.address || {}
@@ -208,6 +208,18 @@ serve(async (req) => {
         position: { lat, lng: lon }
       }
     }) : []
+
+    // If proximity is provided, sort results by distance (closest first)
+    if (proximity && typeof proximity.lat === 'number' && typeof proximity.lng === 'number') {
+      items = items
+        .map((item) => {
+          const distance = haversineKm(proximity, item.position)
+          return { item, distance }
+        })
+        .filter(({ distance }) => distance <= 25) // Filter out results beyond 25km
+        .sort((a, b) => a.distance - b.distance) // Sort by distance (closest first)
+        .map(({ item }) => item)
+    }
 
     return new Response(
       JSON.stringify({ items }),

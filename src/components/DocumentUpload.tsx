@@ -563,13 +563,13 @@ Best regards`);
                 {dragActive ? 'Drop files here!' : 'Drop files here or click to upload'}
               </p>
               <p className="text-xs text-muted-foreground">
-                Supported: PDF, JPG, PNG, GIF, WebP (Max 10MB per file)
+                Supported: PDF, Word (DOC, DOCX), Images (JPG, PNG, GIF, WebP, BMP, TIFF) (Max 10MB per file)
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.tif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
                 onChange={(e) => handleFileUpload(e.target.files)}
                 className="hidden"
                 disabled={uploading}

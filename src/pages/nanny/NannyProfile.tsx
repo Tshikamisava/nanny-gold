@@ -17,6 +17,7 @@ import PhotoUploadDialog from '@/components/PhotoUploadDialog';
 import VerificationStatusDialog from '@/components/VerificationStatusDialog';
 import VerificationProgressCard from '@/components/VerificationProgressCard';
 import { useProfileSubmission } from '@/hooks/useProfileSubmission';
+import { useNannyProfile } from '@/hooks/useNannyProfile';
 import {
   AVAILABLE_LANGUAGES,
   AVAILABLE_SKILLS,
@@ -41,8 +42,6 @@ interface NannyProfile {
 // Constants are now imported from @/constants/nannyOptions
 
 export default function NannyProfile() {
-  const [profile, setProfile] = useState<NannyProfile>({});
-  const [loading, setLoading] = useState(true);
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [tempData, setTempData] = useState<any>({});
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -58,12 +57,16 @@ export default function NannyProfile() {
     submitProfile 
   } = useProfileSubmission();
 
-  useEffect(() => {
-    // Only reload profile if there are no unsaved changes
-    if (!hasUnsavedChanges) {
-      loadProfile();
-    }
-  }, []);
+  // Use the new hook for optimized data management
+  const { 
+    profile: profileData, 
+    isLoading: loading, 
+    saveProfile,
+    isSaving 
+  } = useNannyProfile();
+
+  // Convert profileData to NannyProfile format for compatibility
+  const profile: NannyProfile = profileData || {};
 
   // Prevent data loss when navigating away
   useEffect(() => {
@@ -77,117 +80,6 @@ export default function NannyProfile() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
-
-  const loadProfile = async () => {
-    try {
-      console.log('🔄 Loading nanny profile...');
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
-
-      // Optimized: Single query with join instead of multiple calls
-      const { data: combinedData, error: combinedError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          nannies (
-            bio,
-            experience_level,
-            languages,
-            skills,
-            hourly_rate,
-            monthly_rate,
-            approval_status,
-            is_verified,
-            is_available,
-            can_receive_bookings,
-            service_categories,
-            admin_assigned_categories,
-            admin_notes,
-            created_at,
-            updated_at
-          )
-        `)
-        .eq('id', user.user.id)
-        .single();
-
-      if (combinedError) {
-        console.error('❌ Error loading combined profile data:', combinedError);
-        throw combinedError;
-      }
-
-      // Combine the data properly
-      const combinedProfile: NannyProfile = {
-        ...combinedData,
-        ...(combinedData.nannies || {})
-      };
-
-      console.log('✅ Profile loaded successfully:', combinedProfile);
-      setProfile(combinedProfile);
-    } catch (error) {
-      console.error('❌ Error loading profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateProfile = async (section: string, data: any) => {
-    try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
-
-      console.log('🔄 Updating profile section:', section, 'with data:', data);
-
-      // Update profiles table
-      if (['first_name', 'last_name', 'email', 'phone', 'location', 'avatar_url'].includes(section)) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update(data)
-          .eq('id', user.user.id);
-        
-        if (profileError) {
-          console.error('❌ Error updating profiles table:', profileError);
-          throw profileError;
-        }
-        console.log('✅ Profiles table updated successfully');
-      }
-
-      // Update nannies table
-      if (['bio', 'experience_level', 'languages', 'skills', 'hourly_rate', 'monthly_rate'].includes(section)) {
-        const { error: nannyError } = await supabase
-          .from('nannies')
-          .update({ ...data, updated_at: new Date().toISOString() })
-          .eq('id', user.user.id);
-        
-        if (nannyError) {
-          console.error('❌ Error updating nannies table:', nannyError);
-          throw nannyError;
-        }
-        console.log('✅ Nannies table updated successfully');
-      }
-
-      // Update local state
-      setProfile(prev => ({ ...prev, ...data }));
-      setEditingSection(null);
-      setHasChanges(true); // Mark that changes were made
-      checkDocumentValidation(); // Recheck validation after profile changes
-      
-      toast({ title: "Profile updated successfully" });
-      
-      // Reload profile to ensure consistency with database
-      setTimeout(() => {
-        console.log('🔄 Reloading profile to verify changes...');
-        loadProfile();
-      }, 500);
-      
-    } catch (error) {
-      console.error('❌ Error updating profile:', error);
-      toast({ 
-        title: "Error updating profile", 
-        description: "Your changes may not have been saved. Please try again.",
-        variant: "destructive" 
-      });
-    }
-  };
 
   // Helper function to detect changes in tempData
   const detectChanges = (original: any, current: any) => {
@@ -206,9 +98,23 @@ export default function NannyProfile() {
     setHasUnsavedChanges(false); // Reset flag when canceling
   };
 
-  const saveEdit = (section: string) => {
-    setHasUnsavedChanges(false); // Clear flag before saving
-    updateProfile(section, tempData);
+  const saveEdit = async (section: string) => {
+    try {
+      console.log(' saveEdit called with section:', section);
+      console.log(' tempData being saved:', tempData);
+      
+      // Use the hook's saveProfile function (like client profile does)
+      // This automatically handles cache invalidation and refetching
+      await saveProfile(tempData);
+      
+      console.log(' saveEdit: Save completed, closing edit mode');
+      setEditingSection(null);
+      setHasChanges(true);
+      checkDocumentValidation();
+    } catch (error) {
+      // Error is already handled by the hook's onError callback
+      console.error(' saveEdit: Error saving profile:', error);
+    }
   };
 
   // Track changes in form fields
@@ -222,7 +128,8 @@ export default function NannyProfile() {
   };
 
   const handlePhotoUploaded = (url: string) => {
-    setProfile(prev => ({ ...prev, avatar_url: url }));
+    // Save the photo URL immediately using the hook
+    saveProfile({ avatar_url: url });
   };
 
   if (loading) {
