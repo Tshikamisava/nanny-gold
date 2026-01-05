@@ -1,5 +1,4 @@
 import { Heart, Mail, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -17,7 +16,6 @@ export const Footer = () => {
             </h3>
           </div>
 
-          
 
           {/* Contact */}
           <div className="flex flex-col items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
