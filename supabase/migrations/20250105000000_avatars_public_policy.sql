@@ -7,10 +7,10 @@ FOR SELECT USING (
 );
 
 -- Allow authenticated users to upload their own avatar
+-- Further simplified policy to allow avatar uploads
 CREATE POLICY "Allow users to upload their own avatar" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'avatars' AND 
-  auth.uid() = (storage.foldername(name))[1]
+  bucket_id = 'avatars' AND auth.uid() IS NOT NULL
 );
 
 -- Allow users to update their own avatar

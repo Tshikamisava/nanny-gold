@@ -136,25 +136,84 @@ export const useOptimizedProfile = () => {
   // Optimized photo upload mutation
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
+      console.log('📤 Starting avatar upload...');
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('User not authenticated');
+      if (!user.user) {
+        console.error('❌ No authenticated user');
+        throw new Error('User not authenticated');
+      }
+
+      console.log('👤 User ID:', user.user.id);
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.user.id}/avatar.${fileExt}`;
+      const timestamp = Date.now();
+      const fileNameWithTimestamp = `${user.user.id}/avatar_${timestamp}.${fileExt}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      console.log('📁 Upload path:', fileName);
+      console.log('📁 Timestamped path:', fileNameWithTimestamp);
+
+      // Try uploading with upsert first
+      let uploadData, uploadError;
+      
+      const { data, error } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true
         });
+      
+      uploadData = data;
+      uploadError = error;
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        console.log('🔄 Trying with timestamped filename...');
+        
+        // Try with timestamped filename as fallback
+        const { data: retryData, error: retryError } = await supabase.storage
+          .from('avatars')
+          .upload(fileNameWithTimestamp, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        uploadData = retryData;
+        uploadError = retryError;
+        
+        if (retryError) {
+          console.error('❌ Retry upload error:', retryError);
+          throw retryError;
+        }
+      }
+
+      const finalPath = uploadData?.path || fileName;
+      console.log('✅ Upload successful, path:', finalPath);
 
       // Update profile with new avatar URL
       const { data: publicUrl } = supabase.storage
         .from('avatars')
-        .getPublicUrl(fileName);
+        .getPublicUrl(finalPath);
+
+      if (!publicUrl || !publicUrl.publicUrl) {
+        console.error('❌ Failed to generate public URL');
+        throw new Error('Failed to generate public URL for the uploaded avatar.');
+      }
+
+      console.log('🌐 Public URL:', publicUrl.publicUrl);
+
+      // Update the profile with the new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl.publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', user.user.id);
+
+      if (updateError) {
+        console.error('⚠️ Failed to update profile with avatar URL:', updateError);
+        // Don't throw - the upload succeeded, just log the warning
+      } else {
+        console.log('✅ Profile updated with new avatar URL');
+      }
 
       return publicUrl.publicUrl;
     },
