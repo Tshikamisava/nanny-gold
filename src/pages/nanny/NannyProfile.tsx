@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -83,31 +84,41 @@ export default function NannyProfile() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
-      // Load profile data
-      const { data: profileData, error: profileError } = await supabase
+      // Optimized: Single query with join instead of multiple calls
+      const { data: combinedData, error: combinedError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          nannies (
+            bio,
+            experience_level,
+            languages,
+            skills,
+            hourly_rate,
+            monthly_rate,
+            approval_status,
+            is_verified,
+            is_available,
+            can_receive_bookings,
+            service_categories,
+            admin_assigned_categories,
+            admin_notes,
+            created_at,
+            updated_at
+          )
+        `)
         .eq('id', user.user.id)
         .single();
 
-      if (profileError) {
-        console.error('❌ Error loading profile data:', profileError);
+      if (combinedError) {
+        console.error('❌ Error loading combined profile data:', combinedError);
+        throw combinedError;
       }
 
-      // Load nanny data
-      const { data: nannyData, error: nannyError } = await supabase
-        .from('nannies')
-        .select('*')
-        .eq('id', user.user.id)
-        .single();
-
-      if (nannyError) {
-        console.log('⚠️ Nanny data not found, user may need to complete profile setup');
-      }
-
+      // Combine the data properly
       const combinedProfile: NannyProfile = {
-        ...profileData,
-        ...nannyData
+        ...combinedData,
+        ...(combinedData.nannies || {})
       };
 
       console.log('✅ Profile loaded successfully:', combinedProfile);
