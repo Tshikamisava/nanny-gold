@@ -1,5 +1,4 @@
 import { Heart, Mail, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -15,25 +14,6 @@ export const Footer = () => {
               <span style={{ color: '#d61784' }}>Nanny</span>
               <span style={{ color: '#d4af37' }}>Gold</span>
             </h3>
-          </div>
-
-          {/* Quick Links */}
-          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 text-xs">
-            <Link to="/" className="text-muted-foreground hover:text-primary transition-colors">
-              Home
-            </Link>
-            <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">
-              About
-            </Link>
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              Help
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              Privacy
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              Terms
-            </a>
           </div>
 
           {/* Contact */}
