@@ -34,45 +34,40 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
   const testStorageAccess = async () => {
     try {
       console.log('🔍 Testing storage bucket access...');
-      
-      // Try direct access to document bucket since listBuckets() has permission issues
-      console.log('🔍 Testing direct access to document bucket...');
-      const { data: files, error: bucketError } = await supabase.storage
-        .from('document')
-        .list();
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
       
       if (bucketError) {
-        console.error('❌ Error accessing document bucket:', bucketError);
-        
-        // Try documents (plural) as fallback
-        console.log('🔍 Trying documents bucket (plural)...');
-        const { data: files2, error: bucketError2 } = await supabase.storage
-          .from('documents')
-          .list();
-          
-        if (bucketError2) {
-          console.error('❌ Error accessing documents bucket:', bucketError2);
-          toast({
-            title: "Storage Access Error",
-            description: "Cannot access document storage. Please check your Supabase configuration.",
-            variant: "destructive",
-          });
-          return false;
-        } else {
-          console.log('✅ Documents bucket (plural) is accessible');
-          return true;
-        }
+        console.error('❌ Error listing buckets:', bucketError);
+        return false;
       }
       
-      console.log('✅ Document bucket (singular) is accessible');
-      return true;
+      console.log('✅ Available buckets:', buckets);
+      console.log('🔍 Bucket count:', buckets.length);
       
+      const documentBucket = buckets.find(b => b.name === 'document');
+      if (!documentBucket) {
+        console.error('❌ Document bucket not found');
+        console.log('🔍 Available bucket names:', buckets.map(b => b.name));
+        
+        // More helpful error message
+        toast({
+          title: "Storage Bucket Missing",
+          description: `Found ${buckets.length} buckets but 'document' bucket is missing. Please run the SQL script from create-buckets-manual.sql in your Supabase SQL Editor, running each section separately.`,
+          variant: "destructive",
+          duration: 8000,
+        });
+        return false;
+      }
+      
+      console.log('✅ Document bucket found:', documentBucket);
+      return true;
     } catch (error) {
       console.error('❌ Storage test error:', error);
       toast({
         title: "Storage Connection Error",
-        description: "Unable to access storage. Please check your internet connection and Supabase configuration.",
+        description: "Cannot connect to Supabase storage. Please check your internet connection and Supabase configuration.",
         variant: "destructive",
+        duration: 6000,
       });
       return false;
     }
@@ -228,46 +223,6 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
         const nannyRecordExists = await ensureNannyRecord(userId);
         if (!nannyRecordExists) {
           console.log('❌ Failed to create nanny record');
-          throw new Error('Unable to create nanny profile. Please contact support.');
-        }
-
-        console.log('✅ Nanny record exists');
-
-        // Upload to Supabase storage with proper folder structure
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
-
-        console.log('📤 Uploading to storage:', filePath);
-
-        // Try document (singular) first, then documents (plural) as fallback
-        let uploadData, uploadError;
-        
-        try {
-          const result = await supabase.storage
-            .from('document')
-            .upload(filePath, file);
-          uploadData = result.data;
-          uploadError = result.error;
-        } catch (err) {
-          console.log('🔍 document bucket failed, trying documents bucket...');
-          const result = await supabase.storage
-            .from('documents')
-            .upload(filePath, file);
-          uploadData = result.data;
-          uploadError = result.error;
-        }
-
-        if (uploadError) {
-          console.error('❌ Storage upload error:', uploadError);
-          throw uploadError;
-        }
-
-        console.log('✅ File uploaded to storage:', uploadData);
-
-        // Auto-detect document type based on filename/content
-        const detectedType = detectDocumentType(file.name);
-        const extractedTitle = extractTitleFromFilename(file.name);
 
         console.log('🔍 Document type detected:', detectedType);
 
