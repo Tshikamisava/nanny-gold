@@ -29,6 +29,100 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Test storage bucket access
+  const testStorageAccess = async () => {
+    try {
+      console.log('🔍 Testing storage bucket access...');
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+      
+      if (bucketError) {
+        console.error('❌ Error listing buckets:', bucketError);
+        return false;
+      }
+      
+      console.log('✅ Available buckets:', buckets);
+      
+      const documentsBucket = buckets.find(b => b.name === 'documents');
+      if (!documentsBucket) {
+        console.error('❌ Documents bucket not found');
+        // Show user-friendly error message
+        toast({
+          title: "Storage Not Configured",
+          description: "Please run the SQL script in create-buckets-direct.sql in your Supabase SQL Editor to set up storage buckets.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      console.log('✅ Documents bucket found:', documentsBucket);
+      return true;
+    } catch (error) {
+      console.error('❌ Storage test error:', error);
+      toast({
+        title: "Storage Error",
+        description: "Unable to access storage. Please check your Supabase configuration.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Helper function to ensure nanny record exists
+  const ensureNannyRecord = async (userId: string): Promise<boolean> => {
+    try {
+      console.log('🔍 Checking nanny record for user:', userId);
+      
+      // Check if nanny record exists
+      const { data: nannyRecord, error: nannyError } = await supabase
+        .from('nannies')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (nannyError || !nannyRecord) {
+        console.log('⚠️ Nanny record not found, creating one...');
+        
+        // Create the nanny record if it doesn't exist
+        const { data: newNannyRecord, error: createError } = await supabase
+          .from('nannies')
+          .insert({
+            id: userId,
+            bio: '',
+            experience_level: '1-3',
+            languages: ['English'],
+            skills: ['Childcare'],
+            hourly_rate: null,
+            monthly_rate: null,
+            approval_status: 'pending',
+            is_verified: false,
+            is_available: false,
+            can_receive_bookings: false,
+            service_categories: [],
+            admin_assigned_categories: [],
+            admin_notes: '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        if (createError || !newNannyRecord) {
+          console.error('❌ Failed to create nanny record:', createError);
+          return false;
+        }
+
+        console.log('✅ Nanny record created successfully:', newNannyRecord.id);
+      } else {
+        console.log('✅ Nanny record already exists:', nannyRecord.id);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error ensuring nanny record:', error);
+      return false;
+    }
+  };
+
   // Load existing documents on mount and when targetUserId changes
   useEffect(() => {
     loadExistingDocuments();
@@ -36,11 +130,25 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
 
   const loadExistingDocuments = async () => {
     try {
+      // Test storage access first
+      const storageOk = await testStorageAccess();
+      if (!storageOk) {
+        console.log('⚠️ Storage access test failed, but continuing...');
+      }
+
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
       // Use targetUserId for admin context, otherwise use current user
       const userId = targetUserId || user.user.id;
+
+      // Ensure nanny record exists
+      const nannyRecordExists = await ensureNannyRecord(userId);
+      if (!nannyRecordExists) {
+        console.log('Failed to create nanny record, skipping document load');
+        setDocuments([]);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('nanny_documents')
@@ -70,11 +178,20 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
+    // First check if storage is properly configured
+    const storageOk = await testStorageAccess();
+    if (!storageOk) {
+      return; // Error message already shown in testStorageAccess
+    }
+
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        console.log('🔄 Starting upload for file:', file.name);
+        
         // Basic file size check (10MB)
         if (file.size > 10 * 1024 * 1024) {
+          console.log('❌ File too large:', file.size);
           toast({
             title: "File too large",
             description: `${file.name} exceeds the 10MB limit.`,
@@ -85,24 +202,49 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
 
         // Get authenticated user
         const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('User not authenticated');
+        if (!user.user) {
+          console.log('❌ User not authenticated');
+          throw new Error('User not authenticated');
+        }
+
+        console.log('✅ User authenticated:', user.user.id);
 
         // Use targetUserId for admin context, otherwise use current user
         const userId = targetUserId || user.user.id;
+        console.log('📝 Using user ID:', userId);
+
+        // Ensure nanny record exists
+        const nannyRecordExists = await ensureNannyRecord(userId);
+        if (!nannyRecordExists) {
+          console.log('❌ Failed to create nanny record');
+          throw new Error('Unable to create nanny profile. Please contact support.');
+        }
+
+        console.log('✅ Nanny record exists');
 
         // Upload to Supabase storage with proper folder structure
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${userId}/${fileName}`;
+
+        console.log('📤 Uploading to storage:', filePath);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(`${userId}/${fileName}`, file);
+          .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('❌ Storage upload error:', uploadError);
+          throw uploadError;
+        }
+
+        console.log('✅ File uploaded to storage:', uploadData);
 
         // Auto-detect document type based on filename/content
         const detectedType = detectDocumentType(file.name);
         const extractedTitle = extractTitleFromFilename(file.name);
+
+        console.log('🔍 Document type detected:', detectedType);
 
         // Save to database
         const { data: docData, error: docError } = await supabase
@@ -118,11 +260,16 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
           .single();
 
         if (docError) {
-          console.error('Database insert error:', docError);
+          console.error('❌ Database insert error:', docError);
           throw docError;
         }
 
-        if (!docData) throw new Error('Failed to save document record');
+        if (!docData) {
+          console.log('❌ Failed to save document record');
+          throw new Error('Failed to save document record');
+        }
+
+        console.log('✅ Document saved to database:', docData);
 
         // Add to local state
         const newDoc: UploadedDocument = {
@@ -135,6 +282,7 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
         };
 
         setDocuments(prev => [...prev, newDoc]);
+        console.log('✅ Document added to local state');
       }
 
       // Reload documents to ensure consistency
@@ -149,10 +297,22 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
           : "Your documents are being processed. You'll be notified once verified.",
       });
     } catch (error: any) {
-      console.error('Upload error details:', error);
+      console.error('❌ Upload error details:', error);
+      
+      let errorMessage = "Please try again or contact support.";
+      if (error.message?.includes('Nanny profile not found')) {
+        errorMessage = "Please complete your nanny profile first before uploading documents.";
+      } else if (error.message?.includes('Unable to create nanny profile')) {
+        errorMessage = "We couldn't set up your nanny profile automatically. Please contact support for assistance.";
+      } else if (error.message?.includes('nanny_documents_nanny_id_fkey')) {
+        errorMessage = "Profile setup required. Please complete your nanny profile registration first.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Upload failed",
-        description: error.message || "Please try again or contact support.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

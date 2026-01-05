@@ -19,23 +19,22 @@ import { useProfileSubmission } from '@/hooks/useProfileSubmission';
 import {
   AVAILABLE_LANGUAGES,
   AVAILABLE_SKILLS,
-  AVAILABLE_CERTIFICATIONS,
   EXPERIENCE_LEVELS,
 } from '@/constants/nannyOptions';
 
 interface NannyProfile {
-  first_name?: string;
-  last_name?: string;
-  email?: string;
-  phone?: string;
-  location?: string;
-  bio?: string;
-  experience_level?: string;
-  languages?: string[];
-  skills?: string[];
-  hourly_rate?: number;
-  monthly_rate?: number;
-  avatar_url?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  bio?: string | null;
+  experience_level?: string | null;
+  languages?: string[] | null;
+  skills?: string[] | null;
+  hourly_rate?: number | null;
+  monthly_rate?: number | null;
+  avatar_url?: string | null;
 }
 
 // Constants are now imported from @/constants/nannyOptions
@@ -47,6 +46,7 @@ export default function NannyProfile() {
   const [tempData, setTempData] = useState<any>({});
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const { toast } = useToast();
   const { 
     isSubmitting, 
@@ -58,36 +58,62 @@ export default function NannyProfile() {
   } = useProfileSubmission();
 
   useEffect(() => {
-    loadProfile();
+    // Only reload profile if there are no unsaved changes
+    if (!hasUnsavedChanges) {
+      loadProfile();
+    }
   }, []);
+
+  // Prevent data loss when navigating away
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const loadProfile = async () => {
     try {
+      console.log('🔄 Loading nanny profile...');
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
       // Load profile data
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.user.id)
         .single();
 
+      if (profileError) {
+        console.error('❌ Error loading profile data:', profileError);
+      }
+
       // Load nanny data
-      const { data: nannyData } = await supabase
+      const { data: nannyData, error: nannyError } = await supabase
         .from('nannies')
         .select('*')
         .eq('id', user.user.id)
         .single();
+
+      if (nannyError) {
+        console.log('⚠️ Nanny data not found, user may need to complete profile setup');
+      }
 
       const combinedProfile: NannyProfile = {
         ...profileData,
         ...nannyData
       };
 
+      console.log('✅ Profile loaded successfully:', combinedProfile);
       setProfile(combinedProfile);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('❌ Error loading profile:', error);
     } finally {
       setLoading(false);
     }
@@ -98,44 +124,90 @@ export default function NannyProfile() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
+      console.log('🔄 Updating profile section:', section, 'with data:', data);
+
       // Update profiles table
       if (['first_name', 'last_name', 'email', 'phone', 'location', 'avatar_url'].includes(section)) {
-        await supabase
+        const { error: profileError } = await supabase
           .from('profiles')
           .update(data)
           .eq('id', user.user.id);
+        
+        if (profileError) {
+          console.error('❌ Error updating profiles table:', profileError);
+          throw profileError;
+        }
+        console.log('✅ Profiles table updated successfully');
       }
 
       // Update nannies table
       if (['bio', 'experience_level', 'languages', 'skills', 'hourly_rate', 'monthly_rate'].includes(section)) {
-        await supabase
+        const { error: nannyError } = await supabase
           .from('nannies')
-          .update(data)
+          .update({ ...data, updated_at: new Date().toISOString() })
           .eq('id', user.user.id);
+        
+        if (nannyError) {
+          console.error('❌ Error updating nannies table:', nannyError);
+          throw nannyError;
+        }
+        console.log('✅ Nannies table updated successfully');
       }
 
+      // Update local state
       setProfile(prev => ({ ...prev, ...data }));
       setEditingSection(null);
       setHasChanges(true); // Mark that changes were made
       checkDocumentValidation(); // Recheck validation after profile changes
+      
       toast({ title: "Profile updated successfully" });
+      
+      // Reload profile to ensure consistency with database
+      setTimeout(() => {
+        console.log('🔄 Reloading profile to verify changes...');
+        loadProfile();
+      }, 500);
+      
     } catch (error) {
-      toast({ title: "Error updating profile", variant: "destructive" });
+      console.error('❌ Error updating profile:', error);
+      toast({ 
+        title: "Error updating profile", 
+        description: "Your changes may not have been saved. Please try again.",
+        variant: "destructive" 
+      });
     }
+  };
+
+  // Helper function to detect changes in tempData
+  const detectChanges = (original: any, current: any) => {
+    return JSON.stringify(original) !== JSON.stringify(current);
   };
 
   const startEdit = (section: string, currentData: any) => {
     setEditingSection(section);
     setTempData(currentData);
+    setHasUnsavedChanges(false); // Reset flag when starting to edit
   };
 
   const cancelEdit = () => {
     setEditingSection(null);
     setTempData({});
+    setHasUnsavedChanges(false); // Reset flag when canceling
   };
 
   const saveEdit = (section: string) => {
+    setHasUnsavedChanges(false); // Clear flag before saving
     updateProfile(section, tempData);
+  };
+
+  // Track changes in form fields
+  const handleFieldChange = (field: string, value: any, originalData: any) => {
+    const newTempData = { ...tempData, [field]: value };
+    setTempData(newTempData);
+    
+    // Check if there are actual changes
+    const hasChanges = detectChanges(originalData, newTempData);
+    setHasUnsavedChanges(hasChanges);
   };
 
   const handlePhotoUploaded = (url: string) => {
@@ -180,7 +252,10 @@ export default function NannyProfile() {
                   <Input
                     id="first_name"
                     value={tempData.first_name || ''}
-                    onChange={(e) => setTempData(prev => ({ ...prev, first_name: e.target.value }))}
+                    onChange={(e) => handleFieldChange('first_name', e.target.value, {
+                      first_name: profile.first_name || '',
+                      last_name: profile.last_name || ''
+                    })}
                   />
                 </div>
                 <div>
@@ -188,7 +263,10 @@ export default function NannyProfile() {
                   <Input
                     id="last_name"
                     value={tempData.last_name || ''}
-                    onChange={(e) => setTempData(prev => ({ ...prev, last_name: e.target.value }))}
+                    onChange={(e) => handleFieldChange('last_name', e.target.value, {
+                      first_name: profile.first_name || '',
+                      last_name: profile.last_name || ''
+                    })}
                   />
                 </div>
               </div>
@@ -264,7 +342,6 @@ export default function NannyProfile() {
         </CardContent>
       </Card>
 
-      {/* Contact Information */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between text-lg md:text-xl">
@@ -290,7 +367,11 @@ export default function NannyProfile() {
                   id="email"
                   type="email"
                   value={tempData.email || ''}
-                  onChange={(e) => setTempData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) => handleFieldChange('email', e.target.value, {
+                    email: profile.email || '',
+                    phone: profile.phone || '',
+                    location: profile.location || ''
+                  })}
                 />
               </div>
               <div>
@@ -299,7 +380,11 @@ export default function NannyProfile() {
                   id="phone"
                   placeholder="+27 XX XXX XXXX"
                   value={tempData.phone || ''}
-                  onChange={(e) => setTempData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => handleFieldChange('phone', e.target.value, {
+                    email: profile.email || '',
+                    phone: profile.phone || '',
+                    location: profile.location || ''
+                  })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Please provide your WhatsApp number for easy communication
@@ -309,7 +394,11 @@ export default function NannyProfile() {
                 <Label htmlFor="location">Address</Label>
                 <AddressAutocomplete
                   value={tempData.location || ''}
-                  onChange={(address) => setTempData(prev => ({ ...prev, location: address }))}
+                  onChange={(address) => handleFieldChange('location', address, {
+                    email: profile.email || '',
+                    phone: profile.phone || '',
+                    location: profile.location || ''
+                  })}
                   placeholder="Enter your address"
                 />
               </div>
@@ -385,7 +474,11 @@ export default function NannyProfile() {
                 <Label htmlFor="experience_level">Experience Level</Label>
                 <Select
                   value={tempData.experience_level || ''}
-                  onValueChange={(value) => setTempData(prev => ({ ...prev, experience_level: value }))}
+                  onValueChange={(value) => handleFieldChange('experience_level', value, {
+                    experience_level: profile.experience_level || '1-3',
+                    languages: profile.languages || ['English'],
+                    skills: profile.skills || ['Childcare']
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select experience level" />
@@ -413,7 +506,11 @@ export default function NannyProfile() {
                         const newLangs = currentLangs.includes(lang)
                           ? currentLangs.filter(l => l !== lang)
                           : [...currentLangs, lang];
-                        setTempData(prev => ({ ...prev, languages: newLangs }));
+                        handleFieldChange('languages', newLangs, {
+                          experience_level: profile.experience_level || '1-3',
+                          languages: profile.languages || ['English'],
+                          skills: profile.skills || ['Childcare']
+                        });
                       }}
                     >
                       {lang}
@@ -435,7 +532,11 @@ export default function NannyProfile() {
                         const newSkills = currentSkills.includes(skill)
                           ? currentSkills.filter(s => s !== skill)
                           : [...currentSkills, skill];
-                        setTempData(prev => ({ ...prev, skills: newSkills }));
+                        handleFieldChange('skills', newSkills, {
+                          experience_level: profile.experience_level || '1-3',
+                          languages: profile.languages || ['English'],
+                          skills: profile.skills || ['Childcare']
+                        });
                       }}
                     >
                       {skill}
@@ -532,7 +633,9 @@ export default function NannyProfile() {
                   placeholder="Share your story, experience, and what makes you a great nanny..."
                   className="min-h-[120px]"
                   value={tempData.bio || ''}
-                  onChange={(e) => setTempData(prev => ({ ...prev, bio: e.target.value }))}
+                  onChange={(e) => handleFieldChange('bio', e.target.value, {
+                    bio: profile.bio || ''
+                  })}
                 />
               </div>
               <div className="flex gap-2">
