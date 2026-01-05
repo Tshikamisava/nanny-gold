@@ -16,6 +16,7 @@ import PhotoUploadDialog from '@/components/PhotoUploadDialog';
 import VerificationStatusDialog from '@/components/VerificationStatusDialog';
 import VerificationProgressCard from '@/components/VerificationProgressCard';
 import { useProfileSubmission } from '@/hooks/useProfileSubmission';
+import { useNannyProfile } from '@/hooks/useNannyProfile';
 import {
   AVAILABLE_LANGUAGES,
   AVAILABLE_SKILLS,
@@ -41,8 +42,6 @@ interface NannyProfile {
 // Constants are now imported from @/constants/nannyOptions
 
 export default function NannyProfile() {
-  const [profile, setProfile] = useState<NannyProfile>({});
-  const [loading, setLoading] = useState(true);
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [tempData, setTempData] = useState<any>({});
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -57,72 +56,16 @@ export default function NannyProfile() {
     submitProfile 
   } = useProfileSubmission();
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  // Use the new hook (like useClientProfile) for data management
+  const { 
+    profile: profileData, 
+    isLoading: loading, 
+    saveProfile,
+    isSaving 
+  } = useNannyProfile();
 
-  const loadProfile = async () => {
-    try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
-
-      // Load profile data
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.user.id)
-        .single();
-
-      // Load nanny data
-      const { data: nannyData } = await supabase
-        .from('nannies')
-        .select('*')
-        .eq('id', user.user.id)
-        .single();
-
-      const combinedProfile: NannyProfile = {
-        ...profileData,
-        ...nannyData
-      };
-
-      setProfile(combinedProfile);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateProfile = async (section: string, data: any) => {
-    try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
-
-      // Update profiles table
-      if (['first_name', 'last_name', 'email', 'phone', 'location', 'avatar_url'].includes(section)) {
-        await supabase
-          .from('profiles')
-          .update(data)
-          .eq('id', user.user.id);
-      }
-
-      // Update nannies table
-      if (['bio', 'experience_level', 'languages', 'skills', 'hourly_rate', 'monthly_rate'].includes(section)) {
-        await supabase
-          .from('nannies')
-          .update(data)
-          .eq('id', user.user.id);
-      }
-
-      setProfile(prev => ({ ...prev, ...data }));
-      setEditingSection(null);
-      setHasChanges(true); // Mark that changes were made
-      checkDocumentValidation(); // Recheck validation after profile changes
-      toast({ title: "Profile updated successfully" });
-    } catch (error) {
-      toast({ title: "Error updating profile", variant: "destructive" });
-    }
-  };
+  // Convert profileData to NannyProfile format for compatibility
+  const profile: NannyProfile = profileData || {};
 
   const startEdit = (section: string, currentData: any) => {
     setEditingSection(section);
@@ -134,12 +77,28 @@ export default function NannyProfile() {
     setTempData({});
   };
 
-  const saveEdit = (section: string) => {
-    updateProfile(section, tempData);
+  const saveEdit = async (section: string) => {
+    try {
+      console.log('💾 saveEdit called with section:', section);
+      console.log('📦 tempData being saved:', tempData);
+      
+      // Use the hook's saveProfile function (like client profile does)
+      // This automatically handles cache invalidation and refetching
+      await saveProfile(tempData);
+      
+      console.log('✅ saveEdit: Save completed, closing edit mode');
+      setEditingSection(null);
+      setHasChanges(true);
+      checkDocumentValidation();
+    } catch (error) {
+      // Error is already handled by the hook's onError callback
+      console.error('❌ saveEdit: Error saving profile:', error);
+    }
   };
 
   const handlePhotoUploaded = (url: string) => {
-    setProfile(prev => ({ ...prev, avatar_url: url }));
+    // Save the photo URL immediately using the hook
+    saveProfile({ avatar_url: url });
   };
 
   if (loading) {

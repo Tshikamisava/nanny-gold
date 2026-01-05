@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getUserRole } from "@/utils/userUtils";
 import { ConnectionMonitor } from "@/components/ConnectionMonitor";
 import { AuthService } from "@/services/AuthService";
+import { NannyGoldLogo } from "@/components/NannyGoldLogo";
 
 const LoginScreen = () => {
   const navigate = useNavigate();
@@ -113,10 +114,7 @@ const LoginScreen = () => {
 
         {/* NannyGold Branding */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-2">
-            <span className="text-primary">Nanny</span>
-            <span className="gold-shimmer">Gold</span>
-          </h1>
+          <NannyGoldLogo size="sm" className="mb-4" />
           <p className="text-muted-foreground text-lg">Welcome back</p>
         </div>
 
