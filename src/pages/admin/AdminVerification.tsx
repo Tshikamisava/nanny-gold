@@ -11,13 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Search, 
-  User, 
-  FileText, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Search,
+  User,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
   Eye,
   Mail,
@@ -75,13 +75,12 @@ const VERIFICATION_STEPS = [
 ];
 
 const DOCUMENT_TYPES = [
-  'id_copy',
-  'matric_certificate',
-  'criminal_record_check',
+  'id_document',
+  'criminal_check',
   'reference_letter',
-  'first_aid_certificate',
-  'driver_license',
-  'qualification_certificate'
+  'certification',
+  'bank_details',
+  'medical_certificate'
 ];
 
 export default function AdminVerification() {
@@ -154,7 +153,7 @@ export default function AdminVerification() {
       const processedNannies = nanniesData.map(nanny => {
         const docs = documentsData?.filter(d => d.nanny_id === nanny.id) || [];
         const steps = stepsData?.filter(s => s.nanny_id === nanny.id) || [];
-        
+
         return {
           id: nanny.id,
           first_name: nanny.profiles.first_name || '',
@@ -200,8 +199,8 @@ export default function AdminVerification() {
 
     // Filter by tab
     if (selectedTab === 'pending_verification') {
-      filtered = filtered.filter(n => 
-        n.verification_status === 'document_pending' || 
+      filtered = filtered.filter(n =>
+        n.verification_status === 'document_pending' ||
         n.documents.pending > 0 ||
         (n.documents.verified > 0 && n.verification_status !== 'verified')
       );
@@ -215,7 +214,7 @@ export default function AdminVerification() {
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(n => 
+      filtered = filtered.filter(n =>
         n.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         n.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         n.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -264,7 +263,7 @@ export default function AdminVerification() {
       if (selectedNanny) {
         await loadNannyDocuments(selectedNanny);
       }
-      
+
       // Reload nannies to update counts
       await loadNannyVerifications();
 
@@ -492,7 +491,7 @@ export default function AdminVerification() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="document-type">Document Type</Label>
                 <Select value={uploadDocumentType} onValueChange={setUploadDocumentType}>
@@ -508,7 +507,7 @@ export default function AdminVerification() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="file-upload">Document File</Label>
                 <Input
@@ -518,9 +517,9 @@ export default function AdminVerification() {
                   onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                 />
               </div>
-              
+
               <div className="flex gap-2 pt-4">
-                <Button 
+                <Button
                   onClick={uploadDocumentForNanny}
                   disabled={uploadingDocument || !uploadFile || !uploadNannyId || !uploadDocumentType}
                   className="flex-1"
@@ -532,8 +531,8 @@ export default function AdminVerification() {
                   )}
                   {uploadingDocument ? 'Uploading...' : 'Upload Document'}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowUploadDialog(false)}
                   disabled={uploadingDocument}
                 >
@@ -548,8 +547,8 @@ export default function AdminVerification() {
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
           <TabsTrigger value="pending_verification">
-            Pending Verification ({nannies.filter(n => 
-              n.verification_status === 'document_pending' || 
+            Pending Verification ({nannies.filter(n =>
+              n.verification_status === 'document_pending' ||
               n.documents.pending > 0 ||
               (n.documents.verified > 0 && n.verification_status !== 'verified')
             ).length})
@@ -620,7 +619,7 @@ export default function AdminVerification() {
                             {VERIFICATION_STEPS.map((step) => {
                               const status = getStepStatus(nanny, step.key);
                               const IconComponent = step.icon;
-                              
+
                               return (
                                 <div key={step.key} className="flex items-center space-x-2 text-sm">
                                   <IconComponent className="w-4 h-4" />
@@ -672,7 +671,7 @@ export default function AdminVerification() {
                               onClick={() => {
                                 if ((window as any).scheduleInterviewForNanny) {
                                   (window as any).scheduleInterviewForNanny(
-                                    nanny.id, 
+                                    nanny.id,
                                     `${nanny.first_name} ${nanny.last_name}`
                                   );
                                 } else {
@@ -687,8 +686,8 @@ export default function AdminVerification() {
                           )}
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   setSelectedNanny(nanny.id);
@@ -705,7 +704,7 @@ export default function AdminVerification() {
                                   Document Verification - {nanny.first_name} {nanny.last_name}
                                 </DialogTitle>
                               </DialogHeader>
-                              
+
                               {loadingDocuments ? (
                                 <div className="text-center py-8">
                                   <Loader2 className="h-8 w-8 animate-spin mx-auto" />
@@ -727,7 +726,7 @@ export default function AdminVerification() {
                                               <div>
                                                 <p className="font-medium">{doc.file_name}</p>
                                                 <p className="text-sm text-muted-foreground capitalize">
-                                                  {doc.document_type.replace('_', ' ')} • 
+                                                  {doc.document_type.replace('_', ' ')} •
                                                   Uploaded {new Date(doc.upload_date).toLocaleDateString()}
                                                 </p>
                                                 {doc.rejection_reason && (
@@ -774,7 +773,7 @@ export default function AdminVerification() {
                                       </Card>
                                     ))
                                   )}
-                                  
+
                                   {/* Verification Actions */}
                                   <div className="border-t pt-4 space-y-4">
                                     <div>
@@ -786,7 +785,7 @@ export default function AdminVerification() {
                                         onChange={(e) => setVerificationNotes(e.target.value)}
                                       />
                                     </div>
-                                    
+
                                     <div className="flex space-x-2">
                                       {nanny.documents.verified > 0 && getStepStatus(nanny, 'document_verification') !== 'completed' && (
                                         <Button
@@ -801,7 +800,7 @@ export default function AdminVerification() {
                                           Approve Documents
                                         </Button>
                                       )}
-                                      
+
                                       {nanny.verification_status === 'interview_required' && (
                                         <Button
                                           variant="outline"
@@ -811,7 +810,7 @@ export default function AdminVerification() {
                                           Schedule Interview
                                         </Button>
                                       )}
-                                      
+
                                       {nanny.verification_status === 'interview_required' && (
                                         <Button
                                           onClick={() => completeVerificationStep(nanny.id, 'interview_completed', 'completed')}

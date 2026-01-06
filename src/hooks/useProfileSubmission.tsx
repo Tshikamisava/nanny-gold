@@ -17,9 +17,8 @@ interface DocumentValidation {
 }
 
 const REQUIRED_DOCUMENTS: DocumentRequirement[] = [
-  { type: 'id', name: 'ID Document, Passport, or Immigration Status Document', required: true },
-  { type: 'cv', name: 'CV/Resume', required: true },
-  { type: 'immigration', name: 'Immigration Status Document', required: false }, // Optional since it can serve as ID
+  { type: 'id_document', name: 'ID Document, Passport, or Immigration Status Document', required: true },
+  { type: 'reference_letter', name: 'CV/Resume', required: true },
 ];
 
 export const useProfileSubmission = () => {
@@ -48,28 +47,26 @@ export const useProfileSubmission = () => {
 
       const missingDocuments: string[] = [];
       const rejectedDocuments: string[] = [];
-      
+
       REQUIRED_DOCUMENTS.forEach((reqDoc) => {
-        if (reqDoc.type === 'id') {
-          // For ID documents, accept ID, passport, or immigration documents
-          const idDocs = documents?.filter(doc => 
-            doc.document_type === 'id' || 
-            doc.document_type === 'immigration' ||
-            (doc.document_type === 'other' && (
-              doc.file_name.toLowerCase().includes('passport') ||
+        if (reqDoc.type === 'id_document') {
+          // For ID documents, accept id_document or anything containing keywords
+          const idDocs = documents?.filter(doc =>
+            doc.document_type === 'id_document' ||
+            doc.document_type === 'immigration' || // For backward compatibility if any exist
+            (doc.file_name.toLowerCase().includes('passport') ||
               doc.file_name.toLowerCase().includes('immigration') ||
-              doc.file_name.toLowerCase().includes('asylum')
-            ))
+              doc.file_name.toLowerCase().includes('asylum'))
           ) || [];
 
           if (idDocs.length === 0) {
             missingDocuments.push(reqDoc.name);
           } else {
-            const hasVerifiedOrPending = idDocs.some(doc => 
+            const hasVerifiedOrPending = idDocs.some(doc =>
               doc.verification_status === 'verified' || doc.verification_status === 'pending'
             );
             const hasRejected = idDocs.some(doc => doc.verification_status === 'rejected');
-            
+
             if (!hasVerifiedOrPending) {
               missingDocuments.push(reqDoc.name);
             }
@@ -78,20 +75,20 @@ export const useProfileSubmission = () => {
             }
           }
         } else if (reqDoc.required) {
-          // For other required documents (CV)
-          const matchingDocs = documents?.filter(doc => 
-            doc.document_type === reqDoc.type || 
-            (reqDoc.type === 'cv' && (doc.document_type === 'other' && doc.file_name.toLowerCase().includes('cv')))
+          // For other required documents (CV is mapped to reference_letter)
+          const matchingDocs = documents?.filter(doc =>
+            doc.document_type === reqDoc.type ||
+            (reqDoc.type === 'reference_letter' && doc.file_name.toLowerCase().includes('cv'))
           ) || [];
 
           if (matchingDocs.length === 0) {
             missingDocuments.push(reqDoc.name);
           } else {
-            const hasVerifiedOrPending = matchingDocs.some(doc => 
+            const hasVerifiedOrPending = matchingDocs.some(doc =>
               doc.verification_status === 'verified' || doc.verification_status === 'pending'
             );
             const hasRejected = matchingDocs.some(doc => doc.verification_status === 'rejected');
-            
+
             if (!hasVerifiedOrPending) {
               missingDocuments.push(reqDoc.name);
             }
@@ -129,7 +126,7 @@ export const useProfileSubmission = () => {
       // Update nanny profile with submission timestamp
       const { error } = await supabase
         .from('nannies')
-        .update({ 
+        .update({
           profile_submitted_at: new Date().toISOString(),
           approval_status: 'pending'
         })

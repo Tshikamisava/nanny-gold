@@ -232,7 +232,7 @@ export default function EnhancedSignup() {
   const progress = (step / 3) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4 sm:p-6">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
@@ -245,7 +245,7 @@ export default function EnhancedSignup() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Badge variant="secondary" className="font-medium">
+            <Badge variant="secondary" className="font-medium text-xs sm:text-sm">
               Step {step} of 3
             </Badge>
           </div>
@@ -265,42 +265,35 @@ export default function EnhancedSignup() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Step 1: Name */}
+            {/* Step 1: Personal Information */}
             {step === 1 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right duration-300">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
                       id="firstName"
                       name="firstName"
+                      type="text"
                       placeholder="John"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className="pl-10"
-                      autoFocus
                       required
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
                     <Input
                       id="lastName"
                       name="lastName"
+                      type="text"
                       placeholder="Doe"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className="pl-10"
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="userType">I am a...</Label>
                   <Select
@@ -443,7 +436,7 @@ export default function EnhancedSignup() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground'}`}>
                         {passwordStrength.checks.length ? <Check className="w-3 h-3" /> : <div className="w-3 h-3 border border-current rounded-sm" />}
                         <span>8+ characters</span>
