@@ -133,25 +133,11 @@ export default function DocumentUpload({ hideEmailSupport = false, targetUserId,
           ? "Documents uploaded for nanny. You can now approve or reject them."
           : "Your documents are being processed. You'll be notified once verified.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Upload error:', error);
-      // Show more specific error message to help diagnose the issue
-      const errorMessage = error?.message || error?.error?.message || 'Unknown error';
-      let userMessage = "Please try again or contact support.";
-      
-      if (errorMessage.includes('Bucket') || errorMessage.includes('bucket')) {
-        userMessage = "Storage bucket not found. Please contact support.";
-      } else if (errorMessage.includes('permission') || errorMessage.includes('denied') || errorMessage.includes('RLS')) {
-        userMessage = "Permission denied. Please ensure you're logged in and have the correct permissions.";
-      } else if (errorMessage.includes('not authenticated') || errorMessage.includes('JWT')) {
-        userMessage = "Authentication required. Please log in again.";
-      } else if (errorMessage.includes('size') || errorMessage.includes('too large')) {
-        userMessage = "File is too large. Maximum size is 10MB.";
-      }
-      
       toast({
         title: "Upload failed",
-        description: userMessage,
+        description: "Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
@@ -347,13 +333,13 @@ Best regards`);
                 {dragActive ? 'Drop files here!' : 'Drop files here or click to upload'}
               </p>
               <p className="text-xs text-muted-foreground">
-                Supported: PDF, Word (DOC, DOCX), Images (JPG, PNG, GIF, WebP, BMP, TIFF) (Max 10MB per file)
+                Supported: PDF, JPG, PNG, GIF, WebP (Max 10MB per file)
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.tif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
                 onChange={(e) => handleFileUpload(e.target.files)}
                 className="hidden"
                 disabled={uploading}

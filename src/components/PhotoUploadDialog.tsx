@@ -156,8 +156,14 @@ export default function PhotoUploadDialog({
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Don't update profile directly - let the parent component handle it via callback
-      // This avoids RLS issues and allows the parent to use Edge Function if needed
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
       onPhotoUploaded(publicUrl);
       onOpenChange(false);
       toast({
@@ -174,25 +180,11 @@ export default function PhotoUploadDialog({
         isValidSize: null
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading photo:', error);
-      // Show more specific error message to help diagnose the issue
-      const errorMessage = error?.message || error?.error?.message || 'Unknown error';
-      let userMessage = "Could not upload photo. Please try again.";
-      
-      if (errorMessage.includes('Bucket') || errorMessage.includes('bucket')) {
-        userMessage = "Storage bucket not found. Please contact support.";
-      } else if (errorMessage.includes('permission') || errorMessage.includes('denied') || errorMessage.includes('RLS')) {
-        userMessage = "Permission denied. Please ensure you're logged in and have the correct permissions.";
-      } else if (errorMessage.includes('not authenticated') || errorMessage.includes('JWT')) {
-        userMessage = "Authentication required. Please log in again.";
-      } else if (errorMessage.includes('size') || errorMessage.includes('too large')) {
-        userMessage = "File is too large. Maximum size is 5MB.";
-      }
-      
       toast({
         title: "Upload failed",
-        description: userMessage,
+        description: "Could not upload photo. Please try again.",
         variant: "destructive"
       });
     } finally {

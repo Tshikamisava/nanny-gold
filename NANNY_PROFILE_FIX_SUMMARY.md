@@ -43,3 +43,4 @@ If data still doesn't persist after this fix:
 3. Consider using an edge function (like client profile does) for more control
 4. Check if there are any database triggers overwriting the data
 
+

@@ -51,3 +51,4 @@ USING (auth.uid() = id);
 
 This allows nannies to view their own profile even if their status is 'pending', 'rejected', etc.
 
+

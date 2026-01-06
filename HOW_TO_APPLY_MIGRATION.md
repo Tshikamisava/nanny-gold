@@ -83,3 +83,4 @@ USING (
    - Make sure you're logged in as a nanny user
    - Verify the migration ran successfully (check Supabase dashboard)
 
+
