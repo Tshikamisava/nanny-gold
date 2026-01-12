@@ -2,13 +2,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Star, Heart, Calendar, Loader2 } from "lucide-react";
+import { Star, Heart, Calendar, Loader2, Mail } from "lucide-react";
 import { useMatchingNannies } from "@/hooks/useNannies";
 import { useBooking } from "@/contexts/BookingContext";
 import { calculateHourlyPricing, isHourlyBasedBooking, formatCurrency } from "@/utils/pricingUtils";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useClientProfile } from "@/hooks/useClientProfile";
 
 // Helper function to count children (18 years and under)
 const countChildren = (childrenAges: string[]): number => {
@@ -32,6 +33,7 @@ const MatchResults = () => {
   const navigate = useNavigate();
   const { preferences, createBooking, setSelectedNanny } = useBooking();
   const { toast } = useToast();
+  const { profile: clientProfile } = useClientProfile();
   const [pricingData, setPricingData] = useState<Record<string, any>>({});
   // Per-nanny loading states instead of global
   const [bookingStates, setBookingStates] = useState<Record<string, boolean>>({});
@@ -404,6 +406,71 @@ const MatchResults = () => {
     return info;
   };
 
+  const handleContactSupport = () => {
+    // Get client profile information
+    const firstName = clientProfile?.firstName || 'Client';
+    const lastName = clientProfile?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'Client';
+    const email = clientProfile?.email || '';
+    const phone = clientProfile?.phone || '';
+    const location = clientProfile?.location || preferences.location || 'Not specified';
+    
+    // Get children information
+    const numberOfChildren = preferences.childrenAges ? countChildren(preferences.childrenAges) : 0;
+    const childrenAges = preferences.childrenAges?.filter(age => age.trim() !== '').join(', ') || 'Not specified';
+    
+    // Get preferences
+    const livingArrangement = preferences.livingArrangement || 'Not specified';
+    const durationType = preferences.durationType === 'long_term' ? 'Long-term' : 'Short-term';
+    const bookingSubType = preferences.bookingSubType || 'Not specified';
+    
+    // Get required services
+    const services = [];
+    if (preferences.cooking) services.push('Cooking');
+    if (preferences.specialNeeds) services.push('Diverse Ability Support');
+    if (preferences.drivingSupport) services.push('Driving Support');
+    if (preferences.ecdTraining) services.push('ECD Training');
+    if (preferences.montessori) services.push('Montessori');
+    const servicesList = services.length > 0 ? services.join(', ') : 'None specified';
+    
+    // Build email subject
+    const subject = encodeURIComponent('No Perfect Matches Found - Assistance Requested');
+    
+    // Build email body with all client details
+    const body = encodeURIComponent(`Hi NannyGold Support Team,
+
+I couldn't find perfect matches for my family's requirements. Could you please help me find a suitable nanny?
+
+MY PROFILE DETAILS:
+- Name: ${fullName}
+- Email: ${email}
+- Phone: ${phone}
+- Location: ${location}
+
+FAMILY INFORMATION:
+- Number of Children: ${numberOfChildren}
+- Children's Ages: ${childrenAges}
+
+BOOKING REQUIREMENTS:
+- Booking Type: ${durationType}
+- Booking Sub-Type: ${bookingSubType}
+- Living Arrangement: ${livingArrangement}
+
+REQUIRED SERVICES:
+${servicesList}
+
+ADDITIONAL NOTES:
+I've searched for nannies matching these requirements but couldn't find perfect matches. Please help me find a suitable nanny or suggest how I can adjust my preferences.
+
+Thank you for your assistance!
+
+Best regards,
+${fullName}`);
+    
+    // Open email client with pre-populated email
+    window.location.href = `mailto:care@nannygold.co.za?subject=${subject}&body=${body}`;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background px-6 py-8">
@@ -480,6 +547,31 @@ const MatchResults = () => {
                 Try Again
               </Button>
             </div>
+            
+            {/* Contact Support Section */}
+            <Card className="mt-6 border-primary/20 bg-primary/5">
+              <CardContent className="p-4">
+                <div className="text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-primary">
+                    <Mail className="w-5 h-5" />
+                    <h3 className="font-semibold text-sm">Need Help Finding a Match?</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Our support team can help you find the perfect nanny. Click below to send us your requirements and we'll get back to you.
+                  </p>
+                  <Button 
+                    onClick={handleContactSupport}
+                    className="w-full royal-gradient hover:opacity-90 text-white py-2.5 rounded-lg font-medium text-sm shadow-sm"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Contact Support
+                  </Button>
+                  <p className="text-xs text-muted-foreground/70">
+                    Your profile details will be automatically included
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
             
             <p className="text-xs text-muted-foreground mt-6">
               Our team is constantly onboarding new nannies. Try adjusting your preferences or check back later.
