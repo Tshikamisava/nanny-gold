@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Star, Heart, Calendar, Loader2, Mail } from "lucide-react";
 import { useMatchingNannies } from "@/hooks/useNannies";
 import { useBooking } from "@/contexts/BookingContext";
-import { calculateHourlyPricing, isHourlyBasedBooking, formatCurrency } from "@/utils/pricingUtils";
+import { calculateHourlyPricing, isHourlyBasedBooking, isDailyBasedBooking, formatCurrency } from "@/utils/pricingUtils";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -289,7 +289,8 @@ const MatchResults = () => {
         if (!preferences.selectedDates?.length) {
           throw new Error('Please select dates for your booking');
         }
-        if (!preferences.timeSlots?.length) {
+        // Gap Coverage (temporary_support) doesn't require time slots - it's a daily rate booking
+        if (!isDailyBasedBooking(preferences.bookingSubType) && !preferences.timeSlots?.length) {
           throw new Error('Please select time slots for your booking');
         }
       }

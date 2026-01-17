@@ -110,92 +110,125 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Handle Gap Coverage (daily rates) vs Hourly bookings
+    // Handle Gap Coverage (prorata monthly) vs Hourly bookings
     if (bookingType === 'temporary_support') {
-      // Gap Coverage: Daily rates - R280 weekday, R350 weekend (Fri/Sat/Sun)
-      let totalCost = 0;
-      const breakdown: Array<{ date: string; rate: number; isWeekend: boolean }> = [];
+      // Gap Coverage: Prorata monthly calculation based on home size (sleep-out arrangement)
+      const selectedDatesArray = selectedDates || [];
+      const prorataDays = selectedDatesArray.length;
+      const prorataMultiplier = prorataDays / 30;
 
-      (selectedDates || []).forEach(dateStr => {
-        const date = new Date(dateStr);
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 5 = Friday, 6 = Saturday
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
-        const rate = isWeekend ? 350 : 280;
+      // Get monthly rate based on home size (sleep-out = live_out)
+      const normalizeHomeSize = (size?: string): string => {
+        if (!size) return 'family_hub';
+        const lower = size.toLowerCase().replace(/[- ]/g, '_');
+        if (['pocket_palace', 'family_hub', 'grand_estate', 'monumental_manor', 'epic_estates'].includes(lower)) {
+          return lower;
+        }
+        if (lower.includes('pocket') || lower === 'small') return 'pocket_palace';
+        if (lower.includes('family') || lower === 'medium') return 'family_hub';
+        if (lower.includes('grand') && !lower.includes('epic')) return 'grand_estate';
+        if (lower.includes('monumental') || lower === 'extra_large') return 'monumental_manor';
+        if (lower.includes('epic')) return 'epic_estates';
+        return 'family_hub';
+      };
 
-        totalCost += rate;
-        breakdown.push({ date: dateStr, rate, isWeekend });
-      });
+      const sizeKey = normalizeHomeSize(homeSize);
+      
+      // Monthly rates for sleep-out (live_out) arrangement
+      const monthlyRates: Record<string, number> = {
+        pocket_palace: 4800,
+        family_hub: 6800,
+        grand_estate: 7800,
+        monumental_manor: 9000,
+        epic_estates: 11000
+      };
 
-      // Add Light Housekeeping based on home size (daily rates)
+      const monthlyRate = monthlyRates[sizeKey] || monthlyRates.family_hub;
+      const prorataBaseRate = monthlyRate * prorataMultiplier;
+
+      // Calculate add-ons (prorata monthly rates)
       const serviceCharges: Array<{ name: string; hourlyRate: number; totalCost: number }> = [];
 
-      if (services.lightHousekeeping && homeSize) {
-        let dailyHousekeepingRate = 100; // Default for family_hub
-
-        switch (homeSize.toLowerCase()) {
-          case 'pocket_palace':
-            dailyHousekeepingRate = 80;
-            break;
-          case 'family_hub':
-            dailyHousekeepingRate = 100;
-            break;
-          case 'grand_estate':
-            dailyHousekeepingRate = 120;
-            break;
-          case 'monumental_manor':
-            dailyHousekeepingRate = 140;
-            break;
-          case 'epic_estates':
-            dailyHousekeepingRate = 300;
-            break;
-          default:
-            console.warn(`⚠️ Unknown home size: ${homeSize}, using default rate R100`);
-        }
-
-        console.log(`🏠 Light Housekeeping - Home: ${homeSize}, Rate: R${dailyHousekeepingRate}/day, Days: ${selectedDates.length}`);
-
-        const totalHousekeepingCost = dailyHousekeepingRate * selectedDates.length;
-        serviceCharges.push({
-          name: 'Light Housekeeping (cleaning, laundry, ironing)',
-          hourlyRate: dailyHousekeepingRate, // Daily rate stored in hourlyRate field
-          totalCost: totalHousekeepingCost
-        });
-        totalCost += totalHousekeepingCost;
-      }
-
-      // Add cooking service (R100/day flat rate for temporary_support)
+      // Cooking (prorata monthly: R1500/month)
       if (services.cooking) {
-        const dailyCookingRate = 100; // R100/day flat rate
-        const totalCookingCost = dailyCookingRate * selectedDates.length;
+        const cookingMonthly = 1500;
+        const prorataCooking = cookingMonthly * prorataMultiplier;
         serviceCharges.push({
-          name: 'Cooking/Food-prep (daily)',
-          hourlyRate: dailyCookingRate,
-          totalCost: totalCookingCost
+          name: 'Cooking',
+          hourlyRate: 0, // Not hourly
+          totalCost: prorataCooking
         });
-        totalCost += totalCookingCost;
       }
 
-      // Diverse Ability Support - R0 additional cost
+      // Light Housekeeping (prorata monthly based on home size)
+      if (services.lightHousekeeping) {
+        const dailyRates: Record<string, number> = {
+          pocket_palace: 80,
+          family_hub: 100,
+          grand_estate: 120,
+          monumental_manor: 140,
+          epic_estates: 300
+        };
+        const dailyRate = dailyRates[sizeKey] || dailyRates.family_hub;
+        const monthlyHousekeeping = dailyRate * 30;
+        const prorataHousekeeping = monthlyHousekeeping * prorataMultiplier;
+        serviceCharges.push({
+          name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`,
+          hourlyRate: 0, // Not hourly
+          totalCost: prorataHousekeeping
+        });
+      }
+
+      // Diverse Ability Support (prorata monthly: R1500/month)
       if (services.specialNeeds) {
+        const diverseAbilityMonthly = 1500;
+        const prorataDiverseAbility = diverseAbilityMonthly * prorataMultiplier;
         serviceCharges.push({
           name: 'Diverse Ability Support',
           hourlyRate: 0,
-          totalCost: 0
+          totalCost: prorataDiverseAbility
         });
       }
 
-      // Service fee is WAIVED for Gap Coverage
-      const serviceFee = 0;
+      // Driving Support (prorata monthly: R1500/month)
+      if (services.drivingSupport) {
+        const drivingMonthly = 1500;
+        const prorataDriving = drivingMonthly * prorataMultiplier;
+        serviceCharges.push({
+          name: 'Driving Support',
+          hourlyRate: 0,
+          totalCost: prorataDriving
+        });
+      }
+
+      const addOnsTotal = serviceCharges.reduce((sum, item) => sum + item.totalCost, 0);
+      const prorataAmount = prorataBaseRate + addOnsTotal;
+      const placementFee = 1500; // R1,500 placement fee (payable first)
+
+      // Create breakdown for display (showing daily equivalent for reference)
+      const breakdown: Array<{ date: string; rate: number; isWeekend: boolean }> = 
+        selectedDatesArray.map(dateStr => {
+          const date = new Date(dateStr);
+          const day = date.getDay();
+          const isWeekend = day === 0 || day === 5 || day === 6;
+          const dailyEquivalent = prorataAmount / prorataDays;
+          return { date: dateStr, rate: dailyEquivalent, isWeekend };
+        });
 
       return new Response(
         JSON.stringify({
-          baseHourlyRate: 0, // N/A for daily rates
+          baseHourlyRate: 0, // N/A for prorata monthly
           services: serviceCharges,
-          subtotal: totalCost,
-          serviceFee,
-          total: totalCost,
-          effectiveHourlyRate: 0, // N/A for daily rates
-          dailyBreakdown: breakdown
+          subtotal: prorataAmount,
+          serviceFee: 0, // No service fee, placement fee replaces it
+          total: prorataAmount, // Total prorata amount (payable at end)
+          effectiveHourlyRate: 0, // N/A for prorata monthly
+          dailyBreakdown: breakdown,
+          placementFee, // R2,500 payable first
+          prorataMonthlyRate: monthlyRate,
+          prorataAmount,
+          prorataDays,
+          prorataMultiplier
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
