@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import './index.css';
+import { initializeNativePlatform } from './utils/nativePlatform';
 
 // Create a client with optimized caching
 const queryClient = new QueryClient({
@@ -26,3 +27,6 @@ root.render(
     <App />
   </QueryClientProvider>
 );
+
+// Initialize native platform features (no-op on web)
+initializeNativePlatform();

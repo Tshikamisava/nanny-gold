@@ -157,10 +157,52 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Store referral if provided
       if (userData?.referral_code && authData?.user?.id) {
+        const referralCode = userData.referral_code.toUpperCase();
+        
+        // Update clients table if it exists
         await supabaseClient
           .from('clients')
-          .update({ referral_code_used: userData.referral_code.toUpperCase() })
+          .update({ referral_code_used: referralCode })
           .eq('id', authData.user.id);
+
+        // Look up the referrer in referral_participants
+        const { data: referrer } = await supabaseClient
+          .from('referral_participants')
+          .select('id, user_id, role')
+          .eq('referral_code', referralCode)
+          .eq('active', true)
+          .maybeSingle();
+
+        // Create referral_logs entry linking referrer to new user
+        if (referrer) {
+          await supabaseClient
+            .from('referral_logs')
+            .insert({
+              referrer_id: referrer.id,
+              referred_user_id: authData.user.id,
+              status: 'Pending',
+              notes: `Auto-created on signup via referral code ${referralCode}`
+            });
+          console.log(`[INFO] Referral log created: referrer=${referrer.id}, referred=${authData.user.id}`);
+        }
+      }
+
+      // Auto-enroll new user in referral program with a unique code
+      if (authData?.user?.id) {
+        const userRole = (userData?.user_type === 'nanny') ? 'Nanny' : 'Client';
+        const autoCode = authData.user.id.substring(0, 6).toUpperCase()
+          + Math.random().toString(36).substring(2, 5).toUpperCase();
+
+        await supabaseClient
+          .from('referral_participants')
+          .insert({
+            user_id: authData.user.id,
+            role: userRole,
+            referral_code: autoCode,
+            active: true,
+            notes: 'Auto-enrolled on signup'
+          });
+        console.log(`[INFO] Auto-enrolled user ${authData.user.id} in referral program with code ${autoCode}`);
       }
 
       return new Response(

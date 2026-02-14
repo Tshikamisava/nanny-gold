@@ -84,7 +84,8 @@ const OtpVerification = () => {
             last_name: signupData.name.split(' ').slice(1).join(' ') || '',
             phone: signupData.phone,
             user_type: signupData.userType || 'client',
-            password: signupData.password
+            password: signupData.password,
+            referral_code: signupData.referralCode || undefined
           }
         }
       });

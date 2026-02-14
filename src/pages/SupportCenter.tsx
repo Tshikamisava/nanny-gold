@@ -151,22 +151,20 @@ const SupportCenter = () => {
             <Card>
               <CardContent className="p-4 md:p-6">
                 <div className="space-y-4">
-                  {/* DISABLED: Live Chat - disabled until post-launch */}
-                  <div className="flex items-center justify-between opacity-50">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <MessageCircle className="w-6 h-6 text-muted-foreground" />
+                      <MessageCircle className="w-6 h-6 text-primary" />
                       <div>
-                        <h3 className="font-semibold text-muted-foreground">Live Chat</h3>
-                        <p className="text-xs text-muted-foreground">Coming after launch</p>
+                        <h3 className="font-semibold">Live Chat</h3>
+                        <p className="text-xs text-muted-foreground">Chat with AI or support</p>
                       </div>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled
-                      className="cursor-not-allowed"
+                      onClick={handleLiveChat}
                     >
-                      Coming Soon
+                      Start Chat
                     </Button>
                   </div>
 
@@ -380,13 +378,12 @@ const SupportCenter = () => {
           </div>
         </div>
 
-        {/* DISABLED: AI Chat Widget - disabled until post-launch */}
-        {/* {chatOpen && (
+        {chatOpen && (
           <SmartChatWidget 
             userType={user?.user_metadata?.user_type || 'client'} 
             forceOpen={chatOpen}
           />
-        )} */ }
+        )}
       </div>
     </div>
   );

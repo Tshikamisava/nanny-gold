@@ -38,15 +38,15 @@ export const InvoiceGenerationDialog = () => {
       base_amount: parseFloat(baseAmount),
       apply_rewards: applyRewards,
       description
+    }, {
+      onSuccess: () => {
+        setOpen(false);
+        setSelectedClientId('');
+        setBaseAmount('');
+        setDescription('Service charges');
+        setApplyRewards(false);
+      }
     });
-
-    if (generateInvoice.isSuccess) {
-      setOpen(false);
-      setSelectedClientId('');
-      setBaseAmount('');
-      setDescription('Service charges');
-      setApplyRewards(false);
-    }
   };
 
   return (

@@ -25,3 +25,14 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Capacitor native build artifacts (keep project files, ignore build outputs)
+android/app/build/
+android/.gradle/
+android/build/
+android/app/.cxx/
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+*.keystore
+*.jks

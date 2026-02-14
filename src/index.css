@@ -187,3 +187,47 @@
     @apply h-4 w-4 sm:h-5 sm:h-5;
   }
 }
+
+/* ── Native Mobile App Styles ──────────────────────── */
+
+/* Safe area padding for notched/island devices */
+.native-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.native-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent text selection & callouts in native app */
+.capacitor-native {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Allow text selection in input fields */
+.capacitor-native input,
+.capacitor-native textarea,
+.capacitor-native [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Smooth keyboard push on mobile */
+body.keyboard-open {
+  transition: height 0.25s ease;
+}
+
+/* Prevent pull-to-refresh in native shell */
+html, body {
+  overscroll-behavior-y: contain;
+}
+
+/* Ensure bottom nav clears iOS home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+}
