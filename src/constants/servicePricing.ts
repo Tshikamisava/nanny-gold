@@ -32,7 +32,7 @@ export const SERVICE_PRICING = {
       weekday_rate: 280,
       weekend_rate: 350,
       min_days: 5,
-      placement_fee: 2500 // Replaces service fee
+      placement_fee: 1500 // Replaces service fee
     }
   },
 

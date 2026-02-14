@@ -59,11 +59,6 @@
     @apply bg-background text-foreground font-sans;
     font-family: 'Noto Sans', sans-serif;
   }
-  
-  .font-script {
-    font-family: 'Dancing Script', cursive;
-    font-weight: 700;
-  }
 }
 
 /* Custom gradient classes */

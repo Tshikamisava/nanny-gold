@@ -108,9 +108,12 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', otpRecord.id);
 
     if (purpose === 'signup') {
-      if (!userData?.password || userData.password.length < 8) {
+      // Generate a secure random password if not provided (OTP-based signup doesn't need user password)
+      const password = userData?.password || crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
+      
+      if (password.length < 8) {
         return new Response(
-          JSON.stringify({ success: false, error: "Password must be at least 8 characters" }),
+          JSON.stringify({ success: false, error: "Password generation failed" }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
@@ -118,7 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`[DEBUG] Creating user account for ${email}`);
       const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
         email,
-        password: userData.password,
+        password: password,
         email_confirm: true,
         user_metadata: {
           first_name: userData?.first_name,

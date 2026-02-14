@@ -20,3 +20,6 @@ USING (
   AND auth.uid() != id  -- Don't apply this policy to own profile (handled by policy above)
 );
 
+
+
+

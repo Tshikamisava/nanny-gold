@@ -341,7 +341,8 @@ const PaymentScreen = () => {
     return calculateDailyPricing(selectedDates, bookingSubType, preferences.homeSize, {
       cooking: cleanedPreferences?.cooking,
       specialNeeds: cleanedPreferences?.specialNeeds,
-      drivingSupport: cleanedPreferences?.drivingSupport
+      drivingSupport: cleanedPreferences?.drivingSupport,
+      lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
     });
   }, [
     isDailyBooking,
@@ -350,8 +351,14 @@ const PaymentScreen = () => {
     preferences.homeSize,
     cleanedPreferences?.cooking,
     cleanedPreferences?.specialNeeds,
-    cleanedPreferences?.drivingSupport
+    cleanedPreferences?.drivingSupport,
+    cleanedPreferences?.householdSupport
   ]);
+  
+  // Gap Coverage placement fee (R2,500) - payable first
+  const gapCoveragePlacementFee = isDailyBooking && bookingSubType === 'temporary_support' && dailyPricing?.placementFee
+    ? dailyPricing.placementFee
+    : 0;
   const isHourlyPricingPending = isPricingLoading && !hourlyPricing;
   const isDailyPricingPending = isPricingLoading && !dailyPricing;
 
@@ -766,48 +773,134 @@ const PaymentScreen = () => {
                 </> : `Pay R${hourlyPricing.total.toLocaleString()}`}
               </Button>
             </> : isDailyBooking && dailyPricing ?
-              // Daily pricing breakdown (Gap Coverage)
-              <>
-                <div className="flex justify-between">
-                  <span className="text-foreground">Total Days</span>
-                  <span className="font-medium text-foreground">
-                    {dailyPricing.breakdown.length} days
-                  </span>
-                </div>
-
-                {/* Show breakdown by weekday/weekend */}
-                {dailyPricing.breakdown.map((day, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {new Date(day.date).toLocaleDateString()} ({day.isWeekend ? 'Weekend' : 'Weekday'})
-                    </span>
-                    <span className="font-medium text-secondary">
-                      {formatCurrency(day.rate)}
-                    </span>
-                  </div>
-                ))}
-
-                <div className="border-t border-border pt-4">
-                  <div className="flex justify-between text-lg font-semibold mb-4">
-                    <span className="text-foreground">Total Cost</span>
-                    <span className="text-secondary">
-                      {formatCurrency(dailyPricing.total)}
+              // Daily pricing breakdown (Gap Coverage with prorata)
+              bookingSubType === 'temporary_support' ? (
+                // Gap Coverage: Show prorata monthly calculation
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-foreground">Booking Period</span>
+                    <span className="font-medium text-foreground">
+                      {dailyPricing.prorataDays || dailyPricing.totalDays} days
                     </span>
                   </div>
 
+                  <div className="flex justify-between">
+                    <span className="text-foreground">Monthly Rate (Sleep-out)</span>
+                    <span className="font-medium text-foreground">
+                      {formatCurrency(dailyPricing.prorataMonthlyRate || dailyPricing.baseRate)}/month
+                    </span>
+                  </div>
 
+                  {dailyPricing.prorataMultiplier && (
+                    <div className="text-sm text-muted-foreground mb-3">
+                      Prorata: {dailyPricing.prorataDays} days ÷ 30 = {dailyPricing.prorataMultiplier.toFixed(3)} × {formatCurrency(dailyPricing.prorataMonthlyRate || dailyPricing.baseRate)} = {formatCurrency(dailyPricing.prorataAmount || 0)}
+                    </div>
+                  )}
 
-                  <Button onClick={handlePayment} disabled={isProcessing || isDailyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
+                  {/* Add-on Services */}
+                  {dailyPricing.addOns && dailyPricing.addOns.length > 0 && (
+                    <div className="space-y-2 border-t border-border pt-3 mt-3">
+                      <h4 className="text-sm font-medium text-foreground">Add-on Services (Prorata)</h4>
+                      {dailyPricing.addOns.map((addon, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="text-sm text-foreground">{addon.name}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {formatCurrency(addon.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="border-t border-border pt-4 mb-4">
+                    <div className="flex justify-between">
+                      <span className="text-foreground">Prorata Service Fee</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(dailyPricing.prorataAmount || dailyPricing.total)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment breakdown for Gap Coverage */}
+                  <div className="bg-primary/5 rounded-lg p-4 mb-4 border border-primary/20">
+                    <h3 className="font-semibold text-foreground mb-3">Payment Schedule</h3>
+
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-foreground">Due Today (Placement Fee)</span>
+                      <span className="font-semibold text-secondary text-lg">
+                        {formatCurrency(dailyPricing.placementFee || 0)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Payable now to secure your booking
+                    </p>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-foreground">Due at End of Booking</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(dailyPricing.prorataAmount || dailyPricing.total)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Prorata service fee payable at the end of the booking period
+                    </p>
+                  </div>
+
+                  <Button 
+                    onClick={handlePayment} 
+                    disabled={isProcessing || isDailyPricingPending} 
+                    className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg"
+                  >
                     {isProcessing ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Processing...
                     </> : isDailyPricingPending ? <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Calculating pricing...
-                    </> : `Pay R${dailyPricing.total.toLocaleString()}`}
+                    </> : `Pay ${formatCurrency(dailyPricing.placementFee || 0)} Placement Fee`}
                   </Button>
-                </div>
-              </> : !isHourlyBooking && !isDailyBooking && monthlyPricing ?
+                </>
+              ) : (
+                // Other daily bookings (legacy)
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-foreground">Total Days</span>
+                    <span className="font-medium text-foreground">
+                      {dailyPricing.breakdown.length} days
+                    </span>
+                  </div>
+
+                  {dailyPricing.breakdown.map((day, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {new Date(day.date).toLocaleDateString()} ({day.isWeekend ? 'Weekend' : 'Weekday'})
+                      </span>
+                      <span className="font-medium text-secondary">
+                        {formatCurrency(day.rate)}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="border-t border-border pt-4">
+                    <div className="flex justify-between text-lg font-semibold mb-4">
+                      <span className="text-foreground">Total Cost</span>
+                      <span className="text-secondary">
+                        {formatCurrency(dailyPricing.total)}
+                      </span>
+                    </div>
+
+                    <Button onClick={handlePayment} disabled={isProcessing || isDailyPricingPending} className="w-full royal-gradient hover:opacity-90 text-white py-4 rounded-xl font-semibold text-lg shadow-lg">
+                      {isProcessing ? <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </> : isDailyPricingPending ? <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Calculating pricing...
+                      </> : `Pay R${dailyPricing.total.toLocaleString()}`}
+                    </Button>
+                  </div>
+                </>
+              ) : !isHourlyBooking && !isDailyBooking && monthlyPricing ?
                 // Long-term booking breakdown with authorization/capture flow
                 <>
                   <div className="flex justify-between">

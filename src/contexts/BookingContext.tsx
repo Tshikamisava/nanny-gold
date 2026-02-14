@@ -4,7 +4,7 @@ import { createBookingFromPreferences } from '@/services/bookingService';
 import { saveClientProfile, loadClientProfile, ClientProfileData } from '@/services/clientProfileService';
 import { useToast } from '@/hooks/use-toast';
 import { validatePricingConsistency, mapDatabaseToPreferences } from "@/utils/dataConsistency";
-import { getBookingTypeRate } from '@/utils/pricingUtils';
+import { getBookingTypeRate, isDailyBasedBooking, calculateDailyPricing } from '@/utils/pricingUtils';
 import { cleanPreferences } from '@/utils/valueUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { UserPreferences, PricingBreakdown, BookingContextType } from '@/types/booking';
@@ -512,70 +512,25 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
         effectiveHourlyRate: total / totalHours
       };
     } else if (cleanedPrefs.bookingSubType === 'temporary_support') {
-      // Gap Coverage: daily rates - R280 weekday, R350 weekend
-      const addOns: Array<{ name: string; price: number }> = [];
-      
-      // Light Housekeeping based on home size
-      const lightHousekeeping = cleanedPrefs.householdSupport?.includes('light-housekeeping') || false;
-      if (lightHousekeeping && cleanedPrefs.homeSize) {
-        const homeSize = cleanedPrefs.homeSize;
-        let housekeepingDailyRate = 100; // Default
-        
-        switch (homeSize) {
-          case 'pocket_palace':
-            housekeepingDailyRate = 80;
-            break;
-          case 'family_hub':
-            housekeepingDailyRate = 100;
-            break;
-          case 'grand_estate':
-            housekeepingDailyRate = 120;
-            break;
-          case 'monumental_manor':
-            housekeepingDailyRate = 140;
-            break;
-          case 'epic_estates':
-            housekeepingDailyRate = 300;
-            break;
+      // Gap Coverage: Use prorata monthly calculation
+      const gapCoveragePricing = calculateDailyPricing(
+        cleanedPrefs.selectedDates || [],
+        'temporary_support',
+        cleanedPrefs.homeSize,
+        {
+          cooking: cleanedPrefs.cooking,
+          specialNeeds: cleanedPrefs.specialNeeds,
+          drivingSupport: cleanedPrefs.drivingSupport,
+          lightHousekeeping: cleanedPrefs.householdSupport?.includes('light-housekeeping') || false
         }
-        
-        addOns.push({ name: "Light Housekeeping", price: housekeepingDailyRate });
-      }
-      
-      if (cleanedPrefs.cooking) {
-        // R100/day for cooking
-        addOns.push({ name: "Cooking/Food-prep", price: 100 });
-      }
-      
-      if (cleanedPrefs.specialNeeds) {
-        addOns.push({ name: "Diverse needs support", price: 0 });
-      }
+      );
 
-      if (cleanedPrefs.drivingSupport) {
-        addOns.push({ name: "Driving Support", price: 200 }); // This seems inconsistent, but keeping for now
-      }
-
-      const numberOfDays = cleanedPrefs.selectedDates ? cleanedPrefs.selectedDates.length : 0;
-      
-      let baseTotal = 0;
-      cleanedPrefs.selectedDates?.forEach((dateStr: string) => {
-        const date = new Date(dateStr);
-        const dayOfWeek = date.getDay();
-        
-        if (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6) {
-          baseTotal += 350; // Weekend
-        } else {
-          baseTotal += 280; // Weekday
-        }
-      });
-      
-      const addOnTotal = addOns.reduce((sum, addon) => sum + addon.price, 0) * numberOfDays;
-      const total = baseTotal + addOnTotal;
-
-      return { 
-        baseRate: baseTotal / numberOfDays,
-        addOns, 
-        total
+      return {
+        baseRate: gapCoveragePricing.prorataMonthlyRate || 0,
+        addOns: gapCoveragePricing.addOns,
+        total: gapCoveragePricing.prorataAmount || gapCoveragePricing.total,
+        placementFee: gapCoveragePricing.placementFee,
+        prorataAmount: gapCoveragePricing.prorataAmount
       };
     } else {
       // Other short-term daily pricing
@@ -724,7 +679,8 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
       if (!preferences.selectedDates?.length) {
         throw new Error('Short-term booking requires date selection');
       }
-      if (!preferences.timeSlots?.length) {
+      // Gap Coverage (temporary_support) doesn't require time slots - it's a daily rate booking
+      if (!isDailyBasedBooking(preferences.bookingSubType) && !preferences.timeSlots?.length) {
         throw new Error('Short-term booking requires time slot selection');
       }
     }

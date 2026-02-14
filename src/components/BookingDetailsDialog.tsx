@@ -155,76 +155,133 @@ const calculateShortTermBreakdown = (booking: any) => {
     };
   }
   
-  // Daily bookings (temporary_support)
+  // Daily bookings (temporary_support) - Gap Coverage with prorata monthly
   if (bookingSubType === 'temporary_support') {
     const selectedDates = schedule.selectedDates || [];
-    const dateBreakdown = selectedDates.map((dateStr: string) => {
-      const date = parseISO(dateStr);
-      const dayOfWeek = date.getDay();
-      const isWeekend = [5, 6].includes(dayOfWeek); // Friday, Saturday
-      const rate = isWeekend ? 350 : 280;
-      return { 
-        date: format(date, 'MMM dd, yyyy (EEE)'), 
-        rate, 
-        isWeekend 
-      };
-    });
+    const totalDays = selectedDates.length;
+    const prorataMultiplier = totalDays / 30;
     
-    const totalDays = dateBreakdown.length;
-    const weekdayCount = dateBreakdown.filter(d => !d.isWeekend).length;
-    const weekendCount = dateBreakdown.filter(d => d.isWeekend).length;
-    const weekdayTotal = weekdayCount * 280;
-    const weekendTotal = weekendCount * 350;
+    // Get monthly rate based on home size (sleep-out = live_out)
+    const normalizeHomeSize = (size?: string): string => {
+      if (!size) return 'family_hub';
+      const lower = size.toLowerCase().replace(/[- ]/g, '_');
+      if (['pocket_palace', 'family_hub', 'grand_estate', 'monumental_manor', 'epic_estates'].includes(lower)) {
+        return lower;
+      }
+      if (lower.includes('pocket') || lower === 'small') return 'pocket_palace';
+      if (lower.includes('family') || lower === 'medium') return 'family_hub';
+      if (lower.includes('grand') && !lower.includes('epic')) return 'grand_estate';
+      if (lower.includes('monumental') || lower === 'extra_large') return 'monumental_manor';
+      if (lower.includes('epic')) return 'epic_estates';
+      return 'family_hub';
+    };
     
-    // Calculate add-ons (daily rates)
+    const sizeKey = normalizeHomeSize(homeSize);
+    const monthlyRates: Record<string, number> = {
+      pocket_palace: 4800,
+      family_hub: 6800,
+      grand_estate: 7800,
+      monumental_manor: 9000,
+      epic_estates: 11000
+    };
+    
+    const monthlyRate = monthlyRates[sizeKey] || monthlyRates.family_hub;
+    const prorataBaseRate = monthlyRate * prorataMultiplier;
+    
+    // Calculate add-ons (prorata monthly rates)
     const addOns = [];
-    let subtotal = weekdayTotal + weekendTotal;
+    let subtotal = prorataBaseRate;
     
     if (services.cooking) {
-      const cookingTotal = 100 * totalDays;
-      addOns.push({ name: 'Cooking', rate: 100, unit: 'day', quantity: totalDays, total: cookingTotal });
-      subtotal += cookingTotal;
+      const cookingMonthly = 1500;
+      const prorataCooking = cookingMonthly * prorataMultiplier;
+      addOns.push({ 
+        name: 'Cooking', 
+        rate: cookingMonthly, 
+        unit: 'month (prorata)', 
+        quantity: prorataMultiplier, 
+        total: prorataCooking 
+      });
+      subtotal += prorataCooking;
     }
     
     if (services.householdSupport?.includes('light-housekeeping') || services.lightHousekeeping) {
-      const dailyRate = getHousekeepingRate(homeSize);
-      const housekeepingTotal = dailyRate * totalDays;
+      const dailyRates: Record<string, number> = {
+        pocket_palace: 80,
+        family_hub: 100,
+        grand_estate: 120,
+        monumental_manor: 140,
+        epic_estates: 300
+      };
+      const dailyRate = dailyRates[sizeKey] || dailyRates.family_hub;
+      const monthlyHousekeeping = dailyRate * 30;
+      const prorataHousekeeping = monthlyHousekeeping * prorataMultiplier;
       addOns.push({ 
         name: `Light Housekeeping (${getHomeSizeDisplayName(homeSize)})`, 
-        rate: dailyRate, 
-        unit: 'day', 
-        quantity: totalDays, 
-        total: housekeepingTotal 
+        rate: monthlyHousekeeping, 
+        unit: 'month (prorata)', 
+        quantity: prorataMultiplier, 
+        total: prorataHousekeeping 
       });
-      subtotal += housekeepingTotal;
+      subtotal += prorataHousekeeping;
     }
 
     if (services.drivingSupport) {
-      const drivingTotal = 150 * totalDays;
-      addOns.push({ name: 'Driving Support', rate: 150, unit: 'day', quantity: totalDays, total: drivingTotal });
-      subtotal += drivingTotal;
+      const drivingMonthly = 1500;
+      const prorataDriving = drivingMonthly * prorataMultiplier;
+      addOns.push({ 
+        name: 'Driving Support', 
+        rate: drivingMonthly, 
+        unit: 'month (prorata)', 
+        quantity: prorataMultiplier, 
+        total: prorataDriving 
+      });
+      subtotal += prorataDriving;
     }
 
     if (services.specialNeeds) {
-      const specialNeedsTotal = 200 * totalDays;
-      addOns.push({ name: 'Special Needs Support', rate: 200, unit: 'day', quantity: totalDays, total: specialNeedsTotal });
-      subtotal += specialNeedsTotal;
+      const diverseAbilityMonthly = 1500;
+      const prorataDiverseAbility = diverseAbilityMonthly * prorataMultiplier;
+      addOns.push({ 
+        name: 'Diverse Ability Support', 
+        rate: diverseAbilityMonthly, 
+        unit: 'month (prorata)', 
+        quantity: prorataMultiplier, 
+        total: prorataDiverseAbility 
+      });
+      subtotal += prorataDiverseAbility;
     }
     
-    const serviceFeeWaived = totalDays >= 5;
+    const placementFee = 1500; // R1,500 placement fee (payable first)
+    const prorataAmount = subtotal; // Total prorata amount (payable at end)
+    
+    // Create date breakdown for display (showing daily equivalent for reference)
+    const dateBreakdown = selectedDates.map((dateStr: string) => {
+      const date = parseISO(dateStr);
+      const dailyEquivalent = prorataAmount / totalDays;
+      return { 
+        date: format(date, 'MMM dd, yyyy (EEE)'), 
+        rate: dailyEquivalent, 
+        isWeekend: false // Not relevant for prorata
+      };
+    });
     
     return { 
-      weekdayTotal, 
-      weekendTotal, 
+      weekdayTotal: 0, // Not applicable for prorata
+      weekendTotal: 0, // Not applicable for prorata
       totalDays, 
-      weekdayCount,
-      weekendCount,
+      weekdayCount: 0,
+      weekendCount: 0,
       dateBreakdown, 
       addOns, 
       bookingType: 'daily', 
-      serviceFeeWaived,
-      subtotal,
-      total: subtotal
+      serviceFeeWaived: true, // Placement fee replaces service fee
+      subtotal: prorataAmount,
+      total: prorataAmount,
+      placementFee,
+      prorataAmount,
+      monthlyRate,
+      prorataMultiplier
     };
   }
   
