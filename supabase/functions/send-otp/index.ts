@@ -54,14 +54,16 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Optional phone validation (South African format)
-    const normalizedPhone = (phone ?? '').replace(/\s/g, '');
-    const phoneRegex = /^(\+27|0)[0-9]{9}$/;
-    if (normalizedPhone && !phoneRegex.test(normalizedPhone)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid phone number format. Use South African format (+27 or 0)" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+    // Optional phone validation (South African format) - only validate if phone is provided
+    if (phone) {
+      const normalizedPhone = phone.replace(/\s/g, '');
+      const phoneRegex = /^(\+27|0)[0-9]{9}$/;
+      if (!phoneRegex.test(normalizedPhone)) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid phone number format. Use South African format (+27 or 0)" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     // Generate 6-digit OTP
@@ -83,8 +85,8 @@ const handler = async (req: Request): Promise<Response> => {
     if (otpError) {
       console.error('Error storing OTP:', otpError);
       return new Response(
-        JSON.stringify({ error: 'Failed to generate OTP' }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ success: false, error: 'Failed to generate OTP' }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -154,9 +156,9 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-otp function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: error.message }),
       {
-        status: 500,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );

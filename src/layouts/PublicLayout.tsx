@@ -17,7 +17,7 @@ export const PublicLayout = () => {
                     {/* Header */}
                     <header className="h-16 border-b bg-background flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-10 relative">
                         <div className="flex items-center gap-2 md:gap-4">
-                            <SidebarTrigger />
+                            <SidebarTrigger className="md:hidden" />
                             <div
                                 className="flex items-center space-x-2 cursor-pointer"
                                 onClick={() => navigate('/')}

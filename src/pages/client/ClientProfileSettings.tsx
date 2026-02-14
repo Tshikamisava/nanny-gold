@@ -6,17 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuthContext } from '@/components/AuthProvider';
-import { ClientProfileData } from '@/services/clientProfileService';
+import type { ClientProfileData } from '@/services/clientProfileService';
 import { useClientProfile, useProfileCompletion } from '@/hooks/useClientProfile';
-import { User, Mail, Phone, MapPin, X, HelpCircle, Edit, Home, Users, Heart, Calendar, Loader2, Plus, GraduationCap, Lock } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { User, Mail, Phone, MapPin, X, HelpCircle, Edit, Users, Heart, Loader2, Plus, GraduationCap, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import LanguageSelector from '@/components/LanguageSelector';
 import { validateClientProfile, sanitizeChildrenAges, validateOtherDependents } from '@/utils/profileValidation';
 export default function ClientProfileSettings() {
   const { user, loading: authLoading } = useAuthContext();
-  const { profile, isLoading, saveProfile, isSaving, saveResult, forceRefetch } = useClientProfile();
-  const { isComplete: isProfileComplete, completionPercentage } = useProfileCompletion();
+  const { profile, isLoading, saveProfile, isSaving, forceRefetch } = useClientProfile();
+  const { isComplete: isProfileComplete } = useProfileCompletion();
   const { toast } = useToast();
   
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -75,7 +75,7 @@ export default function ClientProfileSettings() {
       setProfileData(profile);
       console.log('✅ Profile data successfully set in component state');
     }
-  }, [profile, isLoading]); // REDUCED dependencies - only profile and isLoading
+  }, [profile, isLoading, isSaving]); // Added isSaving to dependencies
 
   // Effect 2: Handle initial fetch on component mount
   useEffect(() => {
@@ -115,11 +115,6 @@ export default function ClientProfileSettings() {
     }
     
     await handleSaveProfile();
-    setEditingSection(null);
-    setHasChanges(prev => ({
-      ...prev,
-      [sectionName]: false
-    }));
   };
   const addChildAge = () => {
     console.log('➕ Adding new child age field');
@@ -254,12 +249,36 @@ export default function ClientProfileSettings() {
       }
       
       // Save to backend
-      saveProfile(cleanedData);
-      
-      // Wait for save to complete
-      setTimeout(() => {
+      try {
+        saveProfile(cleanedData);
+        
+        // Show success message immediately for better UX
+        toast({
+          title: "Profile Updated!",
+          description: "Your changes have been saved successfully.",
+        });
+        
+        // Clear editing state
+        setEditingSection(null);
+        setHasChanges({});
+        
+        // Wait for save to complete and then refetch
+        setTimeout(() => {
+          setIsLocalSaving(false);
+          forceRefetch(); // Force refetch to get latest data
+        }, 1000);
+      } catch (saveError) {
+        console.error('❌ Save failed:', saveError);
         setIsLocalSaving(false);
-      }, 1000);
+        
+        // Show error message
+        toast({
+          title: "Save Failed",
+          description: "There was an error saving your profile. Please try again.",
+          variant: "destructive"
+        });
+        return; // Don't continue if save failed
+      }
       
     } catch (error) {
       console.error('❌ Save failed:', error);

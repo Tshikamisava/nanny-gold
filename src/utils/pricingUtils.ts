@@ -15,7 +15,7 @@ export interface HourlyPricingResult {
 }
 
 export interface DailyPricingResult {
-  baseRate: number; // Daily rate
+  baseRate: number; // Daily rate (for non-Gap Coverage) or monthly rate (for Gap Coverage)
   addOns: Array<{ name: string; price: number }>;
   services: Array<{ name: string; price: number }>;
   subtotal: number;
@@ -23,6 +23,12 @@ export interface DailyPricingResult {
   total: number;
   totalDays: number;
   breakdown: Array<{ date: string; isWeekend: boolean; rate: number }>;
+  // Gap Coverage specific fields
+  placementFee?: number; // R2,500 placement fee (payable first)
+  prorataMonthlyRate?: number; // Monthly rate based on home size (sleep-out)
+  prorataAmount?: number; // Prorata amount for the booking period (payable at end)
+  prorataDays?: number; // Number of days in booking period
+  prorataMultiplier?: number; // Days / 30 for prorata calculation
 }
 
 export interface LongTermPricingResult {
@@ -168,6 +174,12 @@ export const calculateDailyPricing = (
     petCare?: boolean;
   } = {}
 ): DailyPricingResult => {
+  // Gap Coverage (temporary_support) uses prorata monthly calculation
+  if (bookingType === 'temporary_support') {
+    return calculateGapCoveragePricing(selectedDates, homeSize, services);
+  }
+
+  // Legacy daily rate calculation for other booking types (if any)
   const weekdayRate = SERVICE_PRICING.short_term.gap_coverage.weekday_rate;
   const weekendRate = SERVICE_PRICING.short_term.gap_coverage.weekend_rate;
 
@@ -184,18 +196,9 @@ export const calculateDailyPricing = (
   });
 
   const baseRate = daysTotal;
-  const serviceFee = SERVICE_PRICING.short_term.gap_coverage.placement_fee; // This is actually the 'service fee' for daily in some contexts, or we use a standard fee.
-  // Note: gap_coverage.placement_fee is 2500, which behaves like a placement fee.
-  // For daily temporary support, we might want a smaller service fee if it's not a full placement. 
-  // For now, using the logic from existing codebase which seems to treat temporary_support specially.
-  // Adjusting to standard service fee if it's just daily booking, or keeping 2500 if it's truly gap coverage placement.
-  // Let's assume standard service fee for daily unless it's a "Placement".
-  // Reverting to standard short term service fee logic for consistency if not specified otherwise, 
-  // but preserving the logic seen in previous file version if possible.
-
   const addOns: Array<{ name: string; price: number }> = [];
 
-  // Cooking for Gap Coverage/Daily
+  // Cooking for other daily bookings
   if (services.cooking) {
     const days = Math.max(1, selectedDates.length);
     addOns.push({ name: 'Cooking', price: SERVICE_PRICING.add_ons.cooking.short_term_daily * days });
@@ -209,9 +212,107 @@ export const calculateDailyPricing = (
     services: addOns,
     subtotal: baseRate + addOnsTotal,
     serviceFee: 0,
-    total: baseRate + addOnsTotal + serviceFee,
+    total: baseRate + addOnsTotal,
     totalDays: selectedDates.length,
     breakdown
+  };
+};
+
+// New function for Gap Coverage prorata monthly pricing
+const calculateGapCoveragePricing = (
+  selectedDates: string[],
+  homeSize?: string,
+  services: {
+    cooking?: boolean;
+    specialNeeds?: boolean;
+    drivingSupport?: boolean;
+    lightHousekeeping?: boolean;
+    petCare?: boolean;
+  } = {}
+): DailyPricingResult => {
+  const sizeKey = normalizeHomeSize(homeSize);
+  
+  // Get monthly rate based on home size (sleep-out arrangement = live_out)
+  const monthlyRate = SERVICE_PRICING.long_term.base_rates[sizeKey]?.live_out || 
+                      SERVICE_PRICING.long_term.base_rates.family_hub.live_out;
+  
+  // Calculate prorata multiplier (days / 30)
+  const prorataDays = selectedDates.length;
+  const prorataMultiplier = prorataDays / 30;
+  
+  // Calculate prorata base rate
+  const prorataBaseRate = monthlyRate * prorataMultiplier;
+  
+  // Calculate add-ons (prorata monthly rates)
+  const addOns: Array<{ name: string; price: number }> = [];
+  
+  // Cooking (prorata monthly)
+  if (services.cooking) {
+    const cookingMonthly = SERVICE_PRICING.add_ons.cooking.long_term_monthly;
+    const prorataCooking = cookingMonthly * prorataMultiplier;
+    addOns.push({ name: 'Cooking', price: prorataCooking });
+  }
+  
+  // Light Housekeeping (prorata monthly based on home size)
+  if (services.lightHousekeeping) {
+    // For Gap Coverage, use a monthly equivalent of daily rates
+    // Daily rates are already in SERVICE_PRICING.add_ons.light_housekeeping
+    // Convert to monthly: daily rate * 30, then prorata
+    const dailyRate = SERVICE_PRICING.add_ons.light_housekeeping[sizeKey] || 
+                      SERVICE_PRICING.add_ons.light_housekeeping.family_hub;
+    const monthlyHousekeeping = dailyRate * 30;
+    const prorataHousekeeping = monthlyHousekeeping * prorataMultiplier;
+    addOns.push({ 
+      name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`, 
+      price: prorataHousekeeping 
+    });
+  }
+  
+  // Diverse Ability Support (prorata monthly)
+  if (services.specialNeeds) {
+    const diverseAbilityMonthly = SERVICE_PRICING.add_ons.diverse_ability.long_term_monthly;
+    const prorataDiverseAbility = diverseAbilityMonthly * prorataMultiplier;
+    addOns.push({ name: 'Diverse Ability Support', price: prorataDiverseAbility });
+  }
+  
+  // Driving Support (prorata monthly)
+  if (services.drivingSupport) {
+    const drivingMonthly = SERVICE_PRICING.add_ons.driving.long_term_monthly;
+    const prorataDriving = drivingMonthly * prorataMultiplier;
+    addOns.push({ name: 'Driving Support', price: prorataDriving });
+  }
+  
+  const addOnsTotal = addOns.reduce((sum, item) => sum + item.price, 0);
+  const prorataAmount = prorataBaseRate + addOnsTotal;
+  
+  // Placement fee (R1,500) - payable first
+  const placementFee = SERVICE_PRICING.short_term.gap_coverage.placement_fee;
+  
+  // Create breakdown for display (showing daily equivalent for reference)
+  const breakdown: Array<{ date: string; isWeekend: boolean; rate: number }> = 
+    selectedDates.map(dateStr => {
+      const date = new Date(dateStr);
+      const day = date.getDay();
+      const isWeekend = day === 0 || day === 5 || day === 6;
+      // Show daily equivalent rate for reference
+      const dailyEquivalent = prorataAmount / prorataDays;
+      return { date: dateStr, isWeekend, rate: dailyEquivalent };
+    });
+  
+  return {
+    baseRate: monthlyRate, // Full monthly rate for reference
+    addOns,
+    services: addOns,
+    subtotal: prorataAmount,
+    serviceFee: 0, // No service fee, placement fee replaces it
+    total: prorataAmount, // Total prorata amount (payable at end)
+    totalDays: prorataDays,
+    breakdown,
+    placementFee, // R2,500 payable first
+    prorataMonthlyRate: monthlyRate,
+    prorataAmount,
+    prorataDays,
+    prorataMultiplier
   };
 };
 

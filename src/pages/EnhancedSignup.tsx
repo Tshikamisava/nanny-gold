@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Loader2, Mail, Lock, User, Phone, Eye, EyeOff, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function EnhancedSignup() {
   const [searchParams] = useSearchParams();
@@ -27,6 +28,7 @@ export default function EnhancedSignup() {
     email: '',
     phone: '',
     password: '',
+    userType: '',
   });
 
   const [passwordStrength, setPasswordStrength] = useState({
@@ -96,6 +98,16 @@ export default function EnhancedSignup() {
       });
       return false;
     }
+
+    if (!formData.userType) {
+      toast({
+        title: "Role Required",
+        description: "Please select your role",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     return true;
   };
 
@@ -166,7 +178,9 @@ export default function EnhancedSignup() {
         body: {
           email: formData.email.trim().toLowerCase(),
           name: formData.firstName,
-          purpose: 'signup'
+          phone: formData.phone, // Include phone number
+          purpose: 'signup',
+          userType: formData.userType // Pass userType to backend
         }
       });
 
@@ -179,8 +193,17 @@ export default function EnhancedSignup() {
         description: `Check your email at ${formData.email}`,
       });
 
-      // Navigate to OTP verification with user data
-      navigate(`/otp-verification?email=${encodeURIComponent(formData.email)}&name=${encodeURIComponent(`${formData.firstName} ${formData.lastName}`)}&phone=${encodeURIComponent(formData.phone)}&password=${encodeURIComponent(formData.password)}`);
+      // Store signup data in sessionStorage temporarily
+      sessionStorage.setItem('signupData', JSON.stringify({
+        email: formData.email,
+        name: `${formData.firstName} ${formData.lastName}`,
+        phone: formData.phone,
+        password: formData.password,
+        userType: formData.userType
+      }));
+
+      // Navigate to OTP verification
+      navigate(`/otp-verification?email=${encodeURIComponent(formData.email)}`);
 
     } catch (error: any) {
       toast({
@@ -210,7 +233,7 @@ export default function EnhancedSignup() {
   const progress = (step / 3) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4 sm:p-6">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
@@ -223,7 +246,7 @@ export default function EnhancedSignup() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Badge variant="secondary" className="font-medium">
+            <Badge variant="secondary" className="font-medium text-xs sm:text-sm">
               Step {step} of 3
             </Badge>
           </div>
@@ -243,47 +266,56 @@ export default function EnhancedSignup() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Step 1: Name */}
+            {/* Step 1: Personal Information */}
             {step === 1 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right duration-300">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
                       id="firstName"
                       name="firstName"
+                      type="text"
                       placeholder="John"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className="pl-10"
-                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      placeholder="Doe"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      placeholder="Doe"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
+                  <Label htmlFor="userType">I am a...</Label>
+                  <Select
+                    value={formData.userType}
+                    onValueChange={(value) => setFormData({ ...formData, userType: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Client (Seeking family support)</SelectItem>
+                      <SelectItem value="nanny">Nanny (Offering family support)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Button
                   type="button"
                   onClick={handleNext}
                   className="w-full"
-                  disabled={!formData.firstName.trim() || !formData.lastName.trim()}
+                  disabled={!formData.firstName.trim() || !formData.lastName.trim() || !formData.userType}
                 >
                   Continue
                 </Button>
@@ -405,7 +437,7 @@ export default function EnhancedSignup() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground'}`}>
                         {passwordStrength.checks.length ? <Check className="w-3 h-3" /> : <div className="w-3 h-3 border border-current rounded-sm" />}
                         <span>8+ characters</span>
@@ -453,7 +485,7 @@ export default function EnhancedSignup() {
                 type="button"
                 variant="link"
                 className="p-0 h-auto font-semibold text-primary"
-                onClick={() => navigate('/auth?mode=signin')}
+                onClick={() => navigate('/login')}
               >
                 Sign in
               </Button>

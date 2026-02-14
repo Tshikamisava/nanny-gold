@@ -46,11 +46,13 @@ export const AddressAutocomplete = ({ value, onChange, placeholder = "Enter your
     const { address } = suggestion;
     const parts: string[] = [];
     
-    // Add house number and street
+    // Add house number and street (primary line)
     if (address.houseNumber && address.street) {
       parts.push(`${address.houseNumber} ${address.street}`);
     } else if (address.street) {
       parts.push(address.street);
+    } else if (address.houseNumber) {
+      parts.push(address.houseNumber);
     } else {
       // Fallback to title if no detailed address
       return suggestion.title;
@@ -63,14 +65,25 @@ export const AddressAutocomplete = ({ value, onChange, placeholder = "Enter your
     const { address } = suggestion;
     const parts: string[] = [];
     
+    // Format: Suburb, Town/City, Province, Postal Code
     // Add district/suburb
     if (address.district) {
       parts.push(address.district);
     }
     
-    // Add city
+    // Add city/town
     if (address.city && address.city !== address.district) {
       parts.push(address.city);
+    }
+    
+    // Add province/state
+    if (address.state) {
+      parts.push(address.state);
+    }
+    
+    // Add postal code
+    if (address.postalCode) {
+      parts.push(address.postalCode);
     }
 
     return parts.join(', ');
