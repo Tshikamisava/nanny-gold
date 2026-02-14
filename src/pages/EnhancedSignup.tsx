@@ -179,7 +179,8 @@ export default function EnhancedSignup() {
           email: formData.email.trim().toLowerCase(),
           name: formData.firstName,
           phone: formData.phone, // Include phone number
-          purpose: 'signup'
+          purpose: 'signup',
+          userType: formData.userType // Pass userType to backend
         }
       });
 
