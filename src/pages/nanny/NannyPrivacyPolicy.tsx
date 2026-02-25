@@ -5,7 +5,9 @@ export default function NannyPrivacyPolicy() {
     <div className="container mx-auto py-8 px-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">NannyGold Privacy Notice</CardTitle>
+          <CardTitle className="text-2xl font-script">
+            <span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span> Privacy Notice
+          </CardTitle>
           <CardDescription>
             Last Updated: 01 October 2025
           </CardDescription>

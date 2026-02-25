@@ -22,7 +22,9 @@ export default function ClientPrivacyPolicy() {
 
         <Card>
           <CardHeader>
-            <CardTitle>NannyGold Privacy Notice</CardTitle>
+            <CardTitle className="font-script">
+              <span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span> Privacy Notice
+            </CardTitle>
             <p className="text-sm text-muted-foreground">Last Updated: 01 October 2025</p>
           </CardHeader>
           <CardContent className="prose max-w-none space-y-6">

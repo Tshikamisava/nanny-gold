@@ -195,17 +195,6 @@ export default function PhotoUploadDialog({
 
       console.log('✅ Profile updated with avatar URL');
 
-<<<<<<< HEAD
-      // Update profile with new avatar URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
-
-=======
->>>>>>> 4cc0b6afc26ffc82d02cec83d8872fee481f7b16
       onPhotoUploaded(publicUrl);
       onOpenChange(false);
       toast({

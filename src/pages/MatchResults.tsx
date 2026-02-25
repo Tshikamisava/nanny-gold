@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useClientProfile } from "@/hooks/useClientProfile";
+import { BookingOverlapDialog } from "@/components/BookingOverlapDialog";
 
 // Helper function to count children (18 years and under)
 const countChildren = (childrenAges: string[]): number => {
@@ -270,6 +271,10 @@ const MatchResults = () => {
     return imageUrl;
   };
 
+  const [overlapDialogOpen, setOverlapDialogOpen] = useState(false);
+  const [overlapBooking, setOverlapBooking] = useState<any>(null);
+  const [overlapNannyName, setOverlapNannyName] = useState<string>('');
+
   const handleBookNanny = async (nannyId: string) => {
     // ✅ P4: Prevent duplicate bookings - check if already processing
     if (bookingStates[nannyId]) {
@@ -314,12 +319,30 @@ const MatchResults = () => {
     } catch (error: any) {
       console.error('Booking error:', error);
       
-      // Phase 5: Show user-friendly error message
-      toast({
-        title: "Booking Error",
-        description: error.message || "Unable to create booking. Please try again.",
-        variant: "destructive"
-      });
+      // Check if this is a booking overlap error
+      if (error.type === 'BOOKING_OVERLAP' || error.message === 'BOOKING_OVERLAP_DETECTED') {
+        // Show overlap dialog instead of toast
+        const selectedNanny = matchingNannies?.find(nanny => nanny.id === nannyId);
+        const nannyName = selectedNanny 
+          ? `${selectedNanny.profiles?.first_name || ''} ${selectedNanny.profiles?.last_name || ''}`.trim()
+          : 'this nanny';
+        
+        setOverlapNannyName(nannyName);
+        setOverlapBooking(error.existingBooking || {
+          id: '',
+          start_date: '',
+          booking_type: 'unknown',
+          status: 'unknown'
+        });
+        setOverlapDialogOpen(true);
+      } else {
+        // Show regular error toast for other errors
+        toast({
+          title: "Booking Error",
+          description: error.message || "Unable to create booking. Please try again.",
+          variant: "destructive"
+        });
+      }
       
       setBookingStates(prev => ({ ...prev, [nannyId]: false }));
     }
@@ -750,6 +773,19 @@ ${fullName}`);
           Refine Search
         </Button>
       </div>
+
+      {/* Booking Overlap Dialog */}
+      {overlapBooking && (
+        <BookingOverlapDialog
+          open={overlapDialogOpen}
+          onClose={() => {
+            setOverlapDialogOpen(false);
+            setOverlapBooking(null);
+          }}
+          existingBooking={overlapBooking}
+          nannyName={overlapNannyName}
+        />
+      )}
     </div>
   );
 };

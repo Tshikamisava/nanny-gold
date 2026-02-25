@@ -192,12 +192,17 @@ const PaymentScreen = () => {
       return placementFee;
     }
 
+    // Gap Coverage (temporary_support): placement fee is what's due today
+    if (isDailyBooking && dailyPricing && bookingSubType === 'temporary_support') {
+      return dailyPricing.placementFee || 0;
+    }
+
     // Short-term hourly: total from hourlyPricing
     if (isHourlyBooking && hourlyPricing && hourlyPricing.total > 0) {
       return hourlyPricing.total;
     }
 
-    // Short-term daily: total from dailyPricing
+    // Short-term daily (non-Gap Coverage): total from dailyPricing
     if (isDailyBooking && dailyPricing && dailyPricing.total > 0) {
       return dailyPricing.total;
     }
@@ -236,6 +241,7 @@ const PaymentScreen = () => {
         baseRate: dailyPricing.total / (dailyPricing.breakdown?.length || 1),
         addOns: [],
         total: dailyPricing.total,
+        placementFee: bookingSubType === 'temporary_support' ? dailyPricing.placementFee : undefined,
         breakdown: dailyPricing
       };
     }
@@ -335,15 +341,36 @@ const PaymentScreen = () => {
 
   // Calculate daily pricing for temporary support
   const dailyPricing = useMemo(() => {
-    if (!isDailyBooking || !selectedDates || !bookingSubType) {
+    try {
+      if (!isDailyBooking || !selectedDates || !bookingSubType) {
+        console.log('⚠️ Daily pricing conditions not met:', {
+          isDailyBooking,
+          hasSelectedDates: !!selectedDates && selectedDates.length > 0,
+          bookingSubType
+        });
+        return null;
+      }
+      
+      const result = calculateDailyPricing(
+        selectedDates, 
+        bookingSubType, 
+        preferences.homeSize, 
+        {
+          cooking: cleanedPreferences?.cooking,
+          specialNeeds: cleanedPreferences?.specialNeeds,
+          drivingSupport: cleanedPreferences?.drivingSupport,
+          lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
+        },
+        cleanedPreferences?.gapCoverageType || 'normal',
+        cleanedPreferences?.isPromotional || false
+      );
+      
+      console.log('✅ Daily pricing calculated:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error calculating daily pricing:', error);
       return null;
     }
-    return calculateDailyPricing(selectedDates, bookingSubType, preferences.homeSize, {
-      cooking: cleanedPreferences?.cooking,
-      specialNeeds: cleanedPreferences?.specialNeeds,
-      drivingSupport: cleanedPreferences?.drivingSupport,
-      lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
-    });
   }, [
     isDailyBooking,
     selectedDates,
@@ -352,7 +379,9 @@ const PaymentScreen = () => {
     cleanedPreferences?.cooking,
     cleanedPreferences?.specialNeeds,
     cleanedPreferences?.drivingSupport,
-    cleanedPreferences?.householdSupport
+    cleanedPreferences?.householdSupport,
+    cleanedPreferences?.gapCoverageType,
+    cleanedPreferences?.isPromotional
   ]);
   
   // Gap Coverage placement fee (R2,500) - payable first
@@ -441,17 +470,53 @@ const PaymentScreen = () => {
       });
 
       // Create booking record first
+      // CRITICAL: booking_type must match valid_booking_type constraint:
+      // Allowed values: 'emergency', 'date_night', 'date_day', 'school_holiday', 'long_term', 'standard'
+      let bookingTypeValue: string;
+      if (isLongTermBooking) {
+        bookingTypeValue = 'long_term';
+      } else if (isHourlyBooking) {
+        // Map bookingSubType to valid booking_type
+        if (bookingSubType === 'emergency') {
+          bookingTypeValue = 'emergency';
+        } else if (bookingSubType === 'date_night') {
+          bookingTypeValue = 'date_night';
+        } else if (bookingSubType === 'date_day') {
+          bookingTypeValue = 'date_day';
+        } else if (bookingSubType === 'school_holiday') {
+          bookingTypeValue = 'school_holiday';
+        } else {
+          bookingTypeValue = 'date_day'; // Default for hourly bookings
+        }
+      } else if (isDailyBooking) {
+        // For daily bookings (Gap Coverage/temporary_support), use 'date_day' or 'standard'
+        if (bookingSubType === 'temporary_support') {
+          bookingTypeValue = 'standard'; // Gap Coverage uses 'standard'
+        } else if (bookingSubType === 'school_holiday') {
+          bookingTypeValue = 'school_holiday';
+        } else {
+          bookingTypeValue = 'date_day';
+        }
+      } else {
+        bookingTypeValue = 'standard'; // Fallback
+      }
+
       const bookingData: any = {
         client_id: user.id,
         nanny_id: selectedNanny.id,
         status: 'pending',
         start_date: cleanedPreferences?.startDate || new Date().toISOString().split('T')[0],
-        booking_type: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'short_term_hourly' : 'short_term_daily',
+        booking_type: bookingTypeValue,
+        base_rate: 0, // Will be set based on booking type below
+        additional_services_cost: 0, // Required field, will be calculated if needed
+        total_monthly_cost: 0, // Required field, will be set based on booking type below
         services: {
           cooking: cleanedPreferences?.cooking || false,
           specialNeeds: cleanedPreferences?.specialNeeds || false,
           drivingSupport: cleanedPreferences?.drivingSupport || false,
-          lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false
+          lightHousekeeping: cleanedPreferences?.householdSupport?.includes('light-housekeeping') || false,
+          bookingSubType: bookingSubType, // Store the actual sub-type in services
+          durationType: cleanedPreferences?.durationType
         }
       };
 
@@ -477,10 +542,31 @@ const PaymentScreen = () => {
           timeSlots: timeSlots,
           bookingSubType: bookingSubType
         };
+        // Set end_date for Gap Coverage based on selected dates
+        if (selectedDates && selectedDates.length > 0) {
+          const sortedDates = [...selectedDates].sort();
+          const lastDate = sortedDates[sortedDates.length - 1];
+          bookingData.end_date = lastDate;
+        }
       }
 
-      console.log('💳 Creating booking - Full Debug:', {
+      // Validate booking_type before passing to EFT screen
+      const validBookingTypes = ['emergency', 'date_night', 'date_day', 'school_holiday', 'long_term', 'standard'];
+      if (!validBookingTypes.includes(bookingTypeValue)) {
+        console.error('❌ Invalid booking_type generated:', bookingTypeValue);
+        console.error('Valid types:', validBookingTypes);
+        console.error('Booking context:', {
+          isLongTermBooking,
+          isHourlyBooking,
+          isDailyBooking,
+          bookingSubType
+        });
+        throw new Error(`Invalid booking type: ${bookingTypeValue}`);
+      }
+
+      console.log('💳 Preparing booking data for EFT payment:', {
         bookingData,
+        bookingTypeValue,
         isHourlyBooking,
         hourlyPricing,
         isDailyBooking,
@@ -488,86 +574,9 @@ const PaymentScreen = () => {
         isLongTermBooking,
         monthlyPricing
       });
-      console.log('📝 Inserting booking data:', bookingData);
 
-      // Check for existing pending bookings with same nanny within last 5 minutes
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { data: existingBookings } = await supabase
-        .from('bookings')
-        .select('id, created_at')
-        .eq('client_id', user.id)
-        .eq('nanny_id', selectedNanny.id)
-        .eq('status', 'pending')
-        .gte('created_at', fiveMinutesAgo)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (existingBookings && existingBookings.length > 0) {
-        console.log('✅ Found existing pending booking, redirecting to EFT payment');
-        const pricingData = buildPricingPayload();
-        const amountDue = calculatePayableAmount();
-        console.log('💰 Existing booking - Amount due:', amountDue, {
-          isLongTermBooking,
-          isHourlyBooking,
-          isDailyBooking,
-          hourlyPricing: hourlyPricing?.total,
-          dailyPricing: dailyPricing?.total,
-          placementFee
-        });
-        navigate('/eft-payment', {
-          state: {
-            bookingId: existingBookings[0].id,
-            pricingData,
-            amount: amountDue,
-            nannyName: selectedNannyName,
-            bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
-          }
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .insert(bookingData)
-        .select()
-        .single();
-
-      if (bookingError) {
-        console.error('❌ Booking creation error:', bookingError);
-        throw new Error(bookingError.message || 'Failed to create booking');
-      }
-
-      console.log('✅ Booking created:', booking.id);
-
-      try {
-        const amountForFinancials = isLongTermBooking && monthlyPricing
-          ? monthlyPricing.total
-          : isHourlyBooking && hourlyPricing
-            ? hourlyPricing.total
-            : isDailyBooking && dailyPricing
-              ? dailyPricing.total
-              : 0;
-
-        const bookingTypeForFinancials = isLongTermBooking
-          ? 'long_term'
-          : isHourlyBooking
-            ? 'short_term_hourly'
-            : 'short_term_daily';
-
-        if (amountForFinancials > 0) {
-          await calculateAndStoreBookingFinancials(
-            booking.id,
-            amountForFinancials,
-            bookingTypeForFinancials,
-            isLongTermBooking ? monthlyPricing?.total : amountForFinancials
-          );
-        }
-      } catch (financialError) {
-        console.error('Error preparing booking financials:', financialError);
-      }
-
-      // Pass comprehensive pricing data to EFT screen with booking ID
+      // CRITICAL: Do NOT create booking here - booking will be created AFTER payment proof is uploaded
+      // Pass booking data to EFT screen instead of booking ID
       const pricingData = buildPricingPayload();
       const amountDue = calculatePayableAmount();
 
@@ -584,17 +593,17 @@ const PaymentScreen = () => {
         pricingDataPlacementFee: pricingData?.placementFee
       });
 
-      console.log('💰 Navigating to EFT with pricing:', {
+      console.log('💰 Navigating to EFT with booking data (booking will be created after proof upload):', {
         pricingData,
         amount: amountDue,
         bookingType: isLongTermBooking ? 'long_term' : isHourlyBooking ? 'hourly' : 'daily'
       });
 
-      // Redirect to EFT payment screen with booking ID and explicit amount
-      // CRITICAL: amountDue is calculated directly from the pricing objects shown on screen
+      // Redirect to EFT payment screen with booking DATA (not booking ID)
+      // Booking will be created AFTER payment proof is uploaded
       navigate('/eft-payment', {
         state: {
-          bookingId: booking.id,
+          bookingData: bookingData, // Pass booking data instead of booking ID
           pricingData,
           amount: amountDue, // This is the exact amount shown on the "Pay R..." button
           nannyName: selectedNannyName,
@@ -791,32 +800,95 @@ const PaymentScreen = () => {
                     </span>
                   </div>
 
-                  {dailyPricing.prorataMultiplier && (
-                    <div className="text-sm text-muted-foreground mb-3">
-                      Prorata: {dailyPricing.prorataDays} days ÷ 30 = {dailyPricing.prorataMultiplier.toFixed(3)} × {formatCurrency(dailyPricing.prorataMonthlyRate || dailyPricing.baseRate)} = {formatCurrency(dailyPricing.prorataAmount || 0)}
+                  {/* Service Fee Calculation */}
+                  {dailyPricing.serviceFeePerDay && (
+                    <div className="text-sm text-muted-foreground mb-3 p-3 bg-muted/30 rounded-lg">
+                      <div className="font-medium mb-1">Service Fee Calculation:</div>
+                      {dailyPricing.prorataDays && dailyPricing.prorataDays <= 10 ? (
+                        <div>Fixed Daily Rate: {formatCurrency(dailyPricing.serviceFeePerDay)}/day</div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div>Monthly Base + Add-ons = {formatCurrency((dailyPricing.prorataMonthlyRate || 0) + (dailyPricing.addOns?.reduce((sum, a) => sum + a.price, 0) || 0))}</div>
+                          <div>÷ 31 days = {formatCurrency(dailyPricing.serviceFeePerDay)}/day</div>
+                          {dailyPricing.gapCoverageType === 'busy_months' && dailyPricing.prorataDays && dailyPricing.prorataDays > 10 && (
+                            <div className="text-orange-600">+ 30% surcharge (Busy Months)</div>
+                          )}
+                          {(dailyPricing.gapCoverageType === 'international' || dailyPricing.gapCoverageType === 'sa_replacement' || dailyPricing.gapCoverageType === 'sa_going_away') && dailyPricing.prorataDays && dailyPricing.prorataDays > 10 && (
+                            <div className="text-orange-600">+ 10% surcharge</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Add-on Services */}
                   {dailyPricing.addOns && dailyPricing.addOns.length > 0 && (
                     <div className="space-y-2 border-t border-border pt-3 mt-3">
-                      <h4 className="text-sm font-medium text-foreground">Add-on Services (Prorata)</h4>
-                      {dailyPricing.addOns.map((addon, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-sm text-foreground">{addon.name}</span>
-                          <span className="text-sm font-medium text-foreground">
-                            {formatCurrency(addon.price)}
-                          </span>
-                        </div>
-                      ))}
+                      <h4 className="text-sm font-medium text-foreground mb-2">Add-on Services</h4>
+                      {dailyPricing.addOns.map((addon, index) => {
+                        // Determine which preference to toggle based on addon name
+                        const getToggleHandler = () => {
+                          if (addon.name.toLowerCase().includes('cooking')) {
+                            return () => updatePreferences({ cooking: !cleanedPreferences?.cooking });
+                          }
+                          if (addon.name.toLowerCase().includes('driving')) {
+                            return () => updatePreferences({ drivingSupport: !cleanedPreferences?.drivingSupport });
+                          }
+                          if (addon.name.toLowerCase().includes('housekeeping')) {
+                            const currentHousehold = cleanedPreferences?.householdSupport || [];
+                            const hasLightHousekeeping = currentHousehold.includes('light-housekeeping');
+                            return () => {
+                              const updated = hasLightHousekeeping
+                                ? currentHousehold.filter(v => v !== 'light-housekeeping')
+                                : [...currentHousehold, 'light-housekeeping'];
+                              updatePreferences({ householdSupport: updated });
+                            };
+                          }
+                          if (addon.name.toLowerCase().includes('diverse') || addon.name.toLowerCase().includes('special')) {
+                            return () => updatePreferences({ specialNeeds: !cleanedPreferences?.specialNeeds });
+                          }
+                          return null;
+                        };
+                        
+                        const toggleHandler = getToggleHandler();
+                        const isIncluded = addon.price === 0;
+                        
+                        return (
+                          <div key={index} className="flex justify-between items-center p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-2 flex-1">
+                              {!isIncluded && toggleHandler && (
+                                <button
+                                  onClick={toggleHandler}
+                                  className="text-xs text-primary hover:text-primary/80 underline"
+                                  title="Remove this add-on"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                              <span className={`text-sm ${isIncluded ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                {addon.name}
+                              </span>
+                            </div>
+                            <span className={`text-sm font-medium ${isIncluded ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              {isIncluded ? 'Included' : formatCurrency(addon.price)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
                   <div className="border-t border-border pt-4 mb-4">
-                    <div className="flex justify-between">
-                      <span className="text-foreground">Prorata Service Fee</span>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-foreground">Service Fee Per Day</span>
                       <span className="font-medium text-foreground">
-                        {formatCurrency(dailyPricing.prorataAmount || dailyPricing.total)}
+                        {formatCurrency(dailyPricing.serviceFeePerDay || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground">Total Service Fee ({dailyPricing.totalDays} days)</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(dailyPricing.total)}
                       </span>
                     </div>
                   </div>
@@ -831,19 +903,45 @@ const PaymentScreen = () => {
                         {formatCurrency(dailyPricing.placementFee || 0)}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Payable now to secure your booking
-                    </p>
+                    {dailyPricing.isPromotional ? (
+                      <>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Payable over 2 months (Promotional Offer)
+                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                          <p className="text-xs text-blue-800 font-medium flex items-start">
+                            <span className="mr-2">💰</span>
+                            <span>A portion of the placement fee is refundable up to 3 months before the start of the booking.</span>
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Payable now to secure your booking
+                      </p>
+                    )}
 
                     <div className="flex justify-between items-center">
-                      <span className="text-foreground">Due at End of Booking</span>
+                      <span className="text-foreground">
+                        {dailyPricing.isPromotional ? 'Service Fee (50% upfront)' : 'Due at End of Booking'}
+                      </span>
                       <span className="font-medium text-foreground">
-                        {formatCurrency(dailyPricing.prorataAmount || dailyPricing.total)}
+                        {dailyPricing.isPromotional 
+                          ? formatCurrency((dailyPricing.total || 0) * 0.5)
+                          : formatCurrency(dailyPricing.total || 0)
+                        }
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Prorata service fee payable at the end of the booking period
-                    </p>
+                    {dailyPricing.isPromotional ? (
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>50% in monthly payments before booking starts</p>
+                        <p>Balance ({formatCurrency((dailyPricing.total || 0) * 0.5)}) paid on last day</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Service fee payable at the end of the booking period
+                      </p>
+                    )}
                   </div>
 
                   <Button 
@@ -900,6 +998,25 @@ const PaymentScreen = () => {
                     </Button>
                   </div>
                 </>
+              ) : isDailyBooking && !dailyPricing ? (
+                // Daily booking but pricing not calculated yet
+                <div className="text-center p-6">
+                  <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+                  <p className="text-muted-foreground mb-2">
+                    {!selectedDates || selectedDates.length === 0 
+                      ? 'Please select dates to calculate pricing'
+                      : 'Calculating pricing...'}
+                  </p>
+                  {(!selectedDates || selectedDates.length === 0) && (
+                    <Button 
+                      onClick={() => navigate('/short-term-booking')}
+                      className="mt-4"
+                      variant="outline"
+                    >
+                      Go Back to Select Dates
+                    </Button>
+                  )}
+                </div>
               ) : !isHourlyBooking && !isDailyBooking && monthlyPricing ?
                 // Long-term booking breakdown with authorization/capture flow
                 <>

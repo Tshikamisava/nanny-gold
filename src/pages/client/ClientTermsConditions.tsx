@@ -22,7 +22,9 @@ export default function ClientTermsConditions() {
 
         <Card>
           <CardHeader>
-            <CardTitle>NannyGold Client Terms and Conditions</CardTitle>
+            <CardTitle className="font-script">
+              <span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span> Client Terms and Conditions
+            </CardTitle>
             <p className="text-sm text-muted-foreground">Effective Date: 01 October 2025</p>
           </CardHeader>
           <CardContent className="prose max-w-none space-y-6">

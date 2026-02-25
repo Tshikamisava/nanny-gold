@@ -38,7 +38,7 @@ export const Footer = () => {
         {/* Copyright */}
         <div className="mt-2 pt-2 border-t border-primary/10 text-center">
           <p className="text-[10px] sm:text-xs text-muted-foreground">
-            © {currentYear} NannyGold. All rights reserved.
+            © {currentYear} <span className="font-script"><span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span></span>. All rights reserved.
           </p>
         </div>
       </div>

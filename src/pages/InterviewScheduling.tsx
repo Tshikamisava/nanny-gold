@@ -218,7 +218,7 @@ END:VCALENDAR`;
 
         {/* NannyGold Branding */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold leading-tight mb-2">
+          <h1 className="text-4xl font-script leading-tight mb-2">
             <span className="text-primary">Nanny</span>
             <span className="gold-shimmer">Gold</span>
           </h1>
