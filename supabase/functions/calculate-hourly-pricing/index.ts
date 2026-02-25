@@ -17,6 +17,8 @@ interface PricingRequest {
   };
   homeSize?: string;
   selectedDates?: string[];
+  gapCoverageType?: 'normal' | 'busy_months' | 'promotional' | 'international' | 'sa_replacement' | 'sa_going_away';
+  isPromotional?: boolean;
 }
 
 interface PricingResponse {
@@ -42,8 +44,12 @@ Deno.serve(async (req) => {
 
 
     const requestBody = await req.json();
-    const { bookingType, totalDays, services, homeSize, selectedDates }: PricingRequest = requestBody;
+    const { bookingType, totalDays, services, homeSize, selectedDates, gapCoverageType, isPromotional }: PricingRequest = requestBody;
     let { totalHours }: PricingRequest = requestBody;
+    
+    // Use provided gapCoverageType or default to 'normal'
+    const effectiveGapCoverageType = gapCoverageType || 'normal';
+    const effectiveIsPromotional = isPromotional || false;
 
     console.log('Pricing request:', { bookingType, totalHours, totalDays, services, homeSize, selectedDates });
 
@@ -110,12 +116,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Handle Gap Coverage (prorata monthly) vs Hourly bookings
+    // Handle Gap Coverage (tiered pricing) vs Hourly bookings
     if (bookingType === 'temporary_support') {
-      // Gap Coverage: Prorata monthly calculation based on home size (sleep-out arrangement)
+      // Gap Coverage: Tiered pricing with new service fee calculation
       const selectedDatesArray = selectedDates || [];
       const prorataDays = selectedDatesArray.length;
-      const prorataMultiplier = prorataDays / 30;
 
       // Get monthly rate based on home size (sleep-out = live_out)
       const normalizeHomeSize = (size?: string): string => {
@@ -144,91 +149,171 @@ Deno.serve(async (req) => {
       };
 
       const monthlyRate = monthlyRates[sizeKey] || monthlyRates.family_hub;
-      const prorataBaseRate = monthlyRate * prorataMultiplier;
 
-      // Calculate add-ons (prorata monthly rates)
-      const serviceCharges: Array<{ name: string; hourlyRate: number; totalCost: number }> = [];
+      // Calculate add-ons (monthly rates for service fee calculation)
+      const addOnsMonthly: Array<{ name: string; price: number }> = [];
 
-      // Cooking (prorata monthly: R1500/month)
+      // Cooking (monthly: R1500/month) - FREE for Monumental Manor and Epic Estates
       if (services.cooking) {
-        const cookingMonthly = 1500;
-        const prorataCooking = cookingMonthly * prorataMultiplier;
-        serviceCharges.push({
-          name: 'Cooking',
-          hourlyRate: 0, // Not hourly
-          totalCost: prorataCooking
-        });
+        if (sizeKey === 'monumental_manor' || sizeKey === 'epic_estates') {
+          addOnsMonthly.push({ name: 'Cooking (Included)', price: 0 });
+        } else {
+          addOnsMonthly.push({ name: 'Cooking', price: 1500 });
+        }
       }
 
-      // Light Housekeeping (prorata monthly based on home size)
+      // Light Housekeeping (monthly based on home size) - FREE for Monumental Manor and Epic Estates
       if (services.lightHousekeeping) {
-        const dailyRates: Record<string, number> = {
-          pocket_palace: 80,
-          family_hub: 100,
-          grand_estate: 120,
-          monumental_manor: 140,
-          epic_estates: 300
-        };
-        const dailyRate = dailyRates[sizeKey] || dailyRates.family_hub;
-        const monthlyHousekeeping = dailyRate * 30;
-        const prorataHousekeeping = monthlyHousekeeping * prorataMultiplier;
-        serviceCharges.push({
-          name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`,
-          hourlyRate: 0, // Not hourly
-          totalCost: prorataHousekeeping
-        });
+        if (sizeKey === 'monumental_manor' || sizeKey === 'epic_estates') {
+          addOnsMonthly.push({ 
+            name: `Light Housekeeping (${sizeKey.replace('_', ' ')}) (Included)`, 
+            price: 0 
+          });
+        } else {
+          const dailyRates: Record<string, number> = {
+            pocket_palace: 80,
+            family_hub: 100,
+            grand_estate: 120,
+            monumental_manor: 140,
+            epic_estates: 300
+          };
+          const dailyRate = dailyRates[sizeKey] || dailyRates.family_hub;
+          const monthlyHousekeeping = dailyRate * 30;
+          addOnsMonthly.push({ 
+            name: `Light Housekeeping (${sizeKey.replace('_', ' ')})`, 
+            price: monthlyHousekeeping 
+          });
+        }
       }
 
-      // Diverse Ability Support (prorata monthly: R1500/month)
+      // Diverse Ability Support (monthly: R1500/month)
       if (services.specialNeeds) {
-        const diverseAbilityMonthly = 1500;
-        const prorataDiverseAbility = diverseAbilityMonthly * prorataMultiplier;
-        serviceCharges.push({
-          name: 'Diverse Ability Support',
-          hourlyRate: 0,
-          totalCost: prorataDiverseAbility
-        });
+        addOnsMonthly.push({ name: 'Diverse Ability Support', price: 1500 });
       }
 
-      // Driving Support (prorata monthly: R1500/month)
+      // Driving Support (monthly: R1500/month) - FREE for Monumental Manor and Epic Estates
       if (services.drivingSupport) {
-        const drivingMonthly = 1500;
-        const prorataDriving = drivingMonthly * prorataMultiplier;
-        serviceCharges.push({
-          name: 'Driving Support',
-          hourlyRate: 0,
-          totalCost: prorataDriving
-        });
+        if (sizeKey === 'monumental_manor' || sizeKey === 'epic_estates') {
+          addOnsMonthly.push({ name: 'Driving Support (Included)', price: 0 });
+        } else {
+          addOnsMonthly.push({ name: 'Driving Support', price: 1500 });
+        }
       }
 
-      const addOnsTotal = serviceCharges.reduce((sum, item) => sum + item.totalCost, 0);
-      const prorataAmount = prorataBaseRate + addOnsTotal;
-      const placementFee = 1500; // R1,500 placement fee (payable first)
+      const addOnsTotal = addOnsMonthly.reduce((sum, item) => sum + item.price, 0);
+      const totalMonthlyFee = monthlyRate + addOnsTotal;
 
-      // Create breakdown for display (showing daily equivalent for reference)
+      // Calculate placement fee based on tier
+      const calculatePlacementFee = (days: number, type: string, isPromo: boolean): number => {
+        if (isPromo) type = 'normal';
+        
+        let tier: 'short' | 'medium' | 'extended';
+        if (days <= 10) tier = 'short';
+        else if (days <= 20) tier = 'medium';
+        else tier = 'extended';
+        
+        switch (type) {
+          case 'normal':
+            const normalFees = { short: 750, medium: 1200, extended: 1800 };
+            return normalFees[tier];
+          case 'busy_months':
+            const busyFees = { short: 1500, medium: 2000, extended: 2500 };
+            return busyFees[tier];
+          case 'international':
+            return 5000;
+          case 'sa_replacement':
+            return 2500;
+          case 'sa_going_away':
+            return 3500;
+          default:
+            const defaultFees = { short: 750, medium: 1200, extended: 1800 };
+            return defaultFees[tier];
+        }
+      };
+
+      // Calculate service fee per day using new formula: (Monthly base + Add-ons) / 31
+      const calculateServiceFeePerDay = (days: number, monthlyBase: number, addOns: number, type: string, isPromo: boolean): number => {
+        if (isPromo) type = 'normal';
+        
+        // For 10 days or less, use fixed daily rate
+        if (days <= 10) {
+          switch (type) {
+            case 'normal':
+              return 370;
+            case 'busy_months':
+              return 420;
+            case 'international':
+              return 840;
+            case 'sa_replacement':
+            case 'sa_going_away':
+              return 420;
+            default:
+              return 370;
+          }
+        }
+        
+        // For 11-30 days: (Monthly base + Add-ons) / 31
+        let serviceFeePerDay = (monthlyBase + addOns) / 31;
+        
+        // Apply surcharge if applicable
+        let surcharge = 0;
+        switch (type) {
+          case 'busy_months':
+            surcharge = 0.30; // 30% surcharge
+            break;
+          case 'international':
+          case 'sa_replacement':
+          case 'sa_going_away':
+            surcharge = 0.10; // 10% surcharge
+            break;
+          default:
+            surcharge = 0;
+        }
+        
+        if (surcharge > 0) {
+          serviceFeePerDay = serviceFeePerDay * (1 + surcharge);
+        }
+        
+        return serviceFeePerDay;
+      };
+
+      const placementFee = calculatePlacementFee(prorataDays, effectiveGapCoverageType, effectiveIsPromotional);
+      const serviceFeePerDay = calculateServiceFeePerDay(prorataDays, monthlyRate, addOnsTotal, effectiveGapCoverageType, effectiveIsPromotional);
+      const totalServiceFee = serviceFeePerDay * prorataDays;
+
+      // Convert addOnsMonthly to serviceCharges format for response
+      const serviceCharges = addOnsMonthly.map(addon => ({
+        name: addon.name,
+        hourlyRate: 0,
+        totalCost: addon.price // Monthly rate for reference
+      }));
+
+      // Create breakdown for display
       const breakdown: Array<{ date: string; rate: number; isWeekend: boolean }> = 
         selectedDatesArray.map(dateStr => {
           const date = new Date(dateStr);
           const day = date.getDay();
           const isWeekend = day === 0 || day === 5 || day === 6;
-          const dailyEquivalent = prorataAmount / prorataDays;
-          return { date: dateStr, rate: dailyEquivalent, isWeekend };
+          return { date: dateStr, rate: serviceFeePerDay, isWeekend };
         });
 
       return new Response(
         JSON.stringify({
-          baseHourlyRate: 0, // N/A for prorata monthly
+          baseHourlyRate: 0, // N/A for Gap Coverage
           services: serviceCharges,
-          subtotal: prorataAmount,
-          serviceFee: 0, // No service fee, placement fee replaces it
-          total: prorataAmount, // Total prorata amount (payable at end)
-          effectiveHourlyRate: 0, // N/A for prorata monthly
+          subtotal: totalServiceFee,
+          serviceFee: 0, // Service fee is included in subtotal
+          total: totalServiceFee, // Total service fee (payable at end)
+          effectiveHourlyRate: 0, // N/A for Gap Coverage
           dailyBreakdown: breakdown,
-          placementFee, // R2,500 payable first
+          placementFee, // Placement fee (payable first) - varies by tier
           prorataMonthlyRate: monthlyRate,
-          prorataAmount,
+          prorataAmount: totalServiceFee,
           prorataDays,
-          prorataMultiplier
+          prorataMultiplier: prorataDays / 31, // Using 31 days as per formula
+          serviceFeePerDay, // Service fee per day for reference
+          gapCoverageType: effectiveGapCoverageType,
+          isPromotional: effectiveIsPromotional
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

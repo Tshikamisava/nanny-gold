@@ -28,6 +28,7 @@ DECLARE
   v_nanny_earnings DECIMAL := 0;
   v_monthly_base_rate DECIMAL := 0;
   v_home_size_formatted TEXT;
+  v_booking_subtype TEXT;
 BEGIN
   -- Format home size key for comparison if needed
   v_home_size_formatted := LOWER(REPLACE(COALESCE(p_home_size, ''), ' ', '_'));
@@ -97,14 +98,23 @@ BEGIN
     -- Short Term Logic
     -- 1. Service Fee
     -- Emergency/DateNight/DayCare: R35.00
-    -- Gap Coverage: R2500 (Placement)?? Or R35?
+    -- Gap Coverage: Placement fee (varies by tier) - check services.bookingSubType
     -- Prompt: "Gap Coverage ... Service Fee: R2500 placement"
     
-    IF p_booking_type = 'temporary_support' THEN
-       v_fixed_fee := 2500.00;
+    -- Check if this is Gap Coverage by looking at services.bookingSubType
+    SELECT COALESCE(b.services->>'bookingSubType', '') INTO v_booking_subtype
+    FROM public.bookings b
+    WHERE b.id = p_booking_id;
+    
+    IF v_booking_subtype = 'temporary_support' THEN
+      -- Gap Coverage: Placement fee varies by tier (handled separately in payment)
+      -- For commission calculation, we use the placement fee that was actually paid
+      -- But since placement fee is separate from service fee, we set fixed_fee to 0 here
+      -- The placement fee is tracked separately and doesn't affect commission calculation
+      v_fixed_fee := 0; -- Placement fee is separate, service fee waived for Gap Coverage
     ELSE
-       v_fixed_fee := 35.00;
-       -- Unless it's "Bespoke"? Assumed standard.
+      -- Other short-term bookings: R35 service fee
+      v_fixed_fee := 35.00;
     END IF;
     
     -- 2. Commission
@@ -117,7 +127,16 @@ BEGIN
     DECLARE
       v_commissionable_amount DECIMAL;
     BEGIN
-      v_commissionable_amount := p_client_total - v_fixed_fee;
+      -- For Gap Coverage, commission is on the service fee (p_client_total is the service fee)
+      -- Placement fee is separate and doesn't affect commission
+      -- For other short-term, commission is on (total - service fee)
+      IF v_booking_subtype = 'temporary_support' THEN
+        -- Gap Coverage: Commission on full service fee (placement fee is separate)
+        v_commissionable_amount := p_client_total;
+      ELSE
+        -- Other short-term: Commission on (total - service fee)
+        v_commissionable_amount := p_client_total - v_fixed_fee;
+      END IF;
       
       -- Safety check
       IF v_commissionable_amount < 0 THEN
@@ -126,7 +145,11 @@ BEGIN
       
       v_commission_amount := ROUND(v_commissionable_amount * 0.20, 2);
       
+      -- Admin total revenue = fixed_fee (if any) + commission
+      -- For Gap Coverage, fixed_fee is 0 (placement fee tracked separately)
       v_admin_total_revenue := v_fixed_fee + v_commission_amount;
+      
+      -- Nanny earnings = commissionable amount - commission
       v_nanny_earnings := v_commissionable_amount - v_commission_amount;
     END;
     

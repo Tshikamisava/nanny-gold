@@ -512,7 +512,7 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
         effectiveHourlyRate: total / totalHours
       };
     } else if (cleanedPrefs.bookingSubType === 'temporary_support') {
-      // Gap Coverage: Use prorata monthly calculation
+      // Gap Coverage: Use tiered pricing calculation
       const gapCoveragePricing = calculateDailyPricing(
         cleanedPrefs.selectedDates || [],
         'temporary_support',
@@ -522,7 +522,9 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
           specialNeeds: cleanedPrefs.specialNeeds,
           drivingSupport: cleanedPrefs.drivingSupport,
           lightHousekeeping: cleanedPrefs.householdSupport?.includes('light-housekeeping') || false
-        }
+        },
+        cleanedPrefs.gapCoverageType || 'normal',
+        cleanedPrefs.isPromotional || false
       );
 
       return {

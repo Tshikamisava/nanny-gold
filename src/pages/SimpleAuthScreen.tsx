@@ -538,7 +538,9 @@ const SimpleAuthScreen = () => {
         <Card className="rounded-xl royal-shadow border-border">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl text-foreground">
-              {isLogin ? 'Sign In' : 'Join NannyGold'}
+              {isLogin ? 'Sign In' : (
+                <>Join <span className="font-script"><span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span></span></>
+              )}
             </CardTitle>
             <p className="text-muted-foreground">
               {isLogin

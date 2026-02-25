@@ -103,6 +103,38 @@
   }
 }
 
+/* NannyGold Brand Text Styling */
+.font-script {
+  font-family: 'Dancing Script', cursive;
+  font-weight: 600;
+}
+
+.nanny-gold-text {
+  font-family: 'Dancing Script', cursive;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.nanny-gold-text .nanny-part {
+  color: hsl(330 78% 56%); /* Fuchsia pink */
+}
+
+.nanny-gold-text .gold-part {
+  background: linear-gradient(
+    90deg,
+    hsl(38 94% 50%) 0%,
+    hsl(45 100% 60%) 25%,
+    hsl(38 94% 50%) 50%,
+    hsl(45 100% 60%) 75%,
+    hsl(38 94% 50%) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
 /* Mobile-optimized dashboard utilities */
 @layer utilities {
   .container-responsive {
