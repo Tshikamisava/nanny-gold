@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, Mail, Lock, User, Phone, Eye, EyeOff, Check, AlertCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, Lock, User, Phone, Eye, EyeOff, Check, AlertCircle, Sparkles, Gift } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,7 +29,10 @@ export default function EnhancedSignup() {
     phone: '',
     password: '',
     userType: '',
+    referralCode: '',
   });
+  const [referralCodeValid, setReferralCodeValid] = useState<boolean | null>(null);
+  const [validatingCode, setValidatingCode] = useState(false);
 
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
@@ -199,7 +202,8 @@ export default function EnhancedSignup() {
         name: `${formData.firstName} ${formData.lastName}`,
         phone: formData.phone,
         password: formData.password,
-        userType: formData.userType
+        userType: formData.userType,
+        referralCode: formData.referralCode || ''
       }));
 
       // Navigate to OTP verification
@@ -240,7 +244,7 @@ export default function EnhancedSignup() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => step > 1 ? setStep(step - 1) : navigate('/auth')}
+              onClick={() => step > 1 ? setStep(step - 1) : navigate('/')}
               className="hover:bg-accent"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -375,6 +379,65 @@ export default function EnhancedSignup() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">10-digit South African number</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+                  <div className="relative">
+                    <Gift className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="referralCode"
+                      name="referralCode"
+                      type="text"
+                      placeholder="Enter referral code"
+                      value={formData.referralCode}
+                      onChange={(e) => {
+                        const code = e.target.value.toUpperCase();
+                        setFormData({ ...formData, referralCode: code });
+                        setReferralCodeValid(null);
+                      }}
+                      onBlur={async () => {
+                        const code = formData.referralCode.trim();
+                        if (!code || code.length < 4) {
+                          setReferralCodeValid(null);
+                          return;
+                        }
+                        setValidatingCode(true);
+                        try {
+                          const { data } = await supabase
+                            .from('referral_participants')
+                            .select('id')
+                            .eq('referral_code', code)
+                            .eq('active', true)
+                            .maybeSingle();
+                          setReferralCodeValid(!!data);
+                        } catch {
+                          setReferralCodeValid(false);
+                        } finally {
+                          setValidatingCode(false);
+                        }
+                      }}
+                      className="pl-10 pr-10"
+                    />
+                    {formData.referralCode && !validatingCode && referralCodeValid !== null && (
+                      <div className="absolute right-3 top-3">
+                        {referralCodeValid ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-red-500" />
+                        )}
+                      </div>
+                    )}
+                    {validatingCode && (
+                      <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  {referralCodeValid === false && (
+                    <p className="text-xs text-red-500">Invalid referral code</p>
+                  )}
+                  {referralCodeValid === true && (
+                    <p className="text-xs text-green-600">Referral code applied!</p>
+                  )}
                 </div>
 
                 <Button

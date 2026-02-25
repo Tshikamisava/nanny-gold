@@ -102,7 +102,7 @@ export const NannyReferrals = () => {
           ) : (
             <Alert>
               <AlertDescription>
-                No active referral code found. Contact support to get your referral code.
+                Your referral code is being generated. Please refresh the page in a moment.
               </AlertDescription>
             </Alert>
           )}
