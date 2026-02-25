@@ -11,6 +11,7 @@ import { formatCurrency } from "@/utils/pricingUtils";
 import { unifiedPricingCalculator } from "@/utils/unifiedPricingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BookingOverlapDialog } from "@/components/BookingOverlapDialog";
 
 const EFTPaymentScreen = () => {
   const navigate = useNavigate();
@@ -29,7 +30,8 @@ const EFTPaymentScreen = () => {
   }, [proofFile]);
 
   // Get data from navigation state
-  const bookingId = location.state?.bookingId;
+  const bookingId = location.state?.bookingId; // For existing bookings (invoices)
+  const bookingData = location.state?.bookingData; // For new bookings (from PaymentScreen)
   const pricingData = location.state?.pricingData;
   const nannyName = location.state?.nannyName || 'Selected Nanny';
   const bookingType = location.state?.bookingType || 'long_term';
@@ -37,9 +39,9 @@ const EFTPaymentScreen = () => {
   const invoiceNumber = location.state?.invoiceNumber;
   const amount = location.state?.amount;
 
-  // Redirect if no booking ID or invoice ID
+  // Redirect if no booking ID (for invoices) and no booking data (for new bookings)
   useEffect(() => {
-    if (!bookingId && !invoiceId) {
+    if (!bookingId && !bookingData && !invoiceId) {
       toast({
         title: "Error",
         description: "No booking or invoice found. Please start over.",
@@ -47,7 +49,7 @@ const EFTPaymentScreen = () => {
       });
       navigate('/client/invoices');
     }
-  }, [bookingId, invoiceId, navigate, toast]);
+  }, [bookingId, bookingData, invoiceId, navigate, toast]);
 
   // Bank details for EFT payments
   const bankDetails = {
@@ -70,16 +72,22 @@ const EFTPaymentScreen = () => {
       return amount;
     }
     
-    // Priority 2: Fallback to pricingData.total (for short-term bookings)
-    if (pricingData?.total && pricingData.total > 0) {
-      console.log('💰 EFT Amount: Using pricingData.total:', pricingData.total);
-      return pricingData.total;
+    // Priority 2: For Gap Coverage (temporary_support), use placementFee
+    if (pricingData?.placementFee && pricingData.placementFee > 0 && bookingType === 'daily') {
+      console.log('💰 EFT Amount: Using pricingData.placementFee for Gap Coverage:', pricingData.placementFee);
+      return pricingData.placementFee;
     }
     
     // Priority 3: Fallback to pricingData.placementFee (ONLY for long-term bookings)
     if (bookingType === 'long_term' && pricingData?.placementFee && pricingData.placementFee > 0) {
       console.log('💰 EFT Amount: Using pricingData.placementFee:', pricingData.placementFee);
       return pricingData.placementFee;
+    }
+    
+    // Priority 4: Fallback to pricingData.total (for short-term bookings that aren't Gap Coverage)
+    if (pricingData?.total && pricingData.total > 0) {
+      console.log('💰 EFT Amount: Using pricingData.total:', pricingData.total);
+      return pricingData.total;
     }
     
     // Should never reach here if PaymentScreen is working correctly
@@ -182,7 +190,7 @@ const EFTPaymentScreen = () => {
   };
 
   const uploadProofOfPayment = async () => {
-    console.log('🔵 Upload button clicked', { proofFile: !!proofFile, user: !!user, bookingId, uploading });
+    console.log('🔵 Upload button clicked', { proofFile: !!proofFile, user: !!user, bookingId, bookingData, uploading });
     
     if (!proofFile || !user) {
       console.warn('⚠️ Missing requirements:', { hasProofFile: !!proofFile, hasUser: !!user });
@@ -194,11 +202,13 @@ const EFTPaymentScreen = () => {
       return;
     }
 
-    if (!bookingId) {
-      console.error('❌ No booking ID found');
+    // CRITICAL: For new bookings, we need booking data (not booking ID)
+    // For existing bookings (invoices), we need booking ID
+    if (!bookingId && !bookingData && !invoiceId) {
+      console.error('❌ No booking ID or booking data found');
       toast({
         title: "Error",
-        description: "No booking ID found. Please start over.",
+        description: "No booking information found. Please start over.",
         variant: "destructive"
       });
       return;
@@ -237,12 +247,118 @@ const EFTPaymentScreen = () => {
         throw new Error('No active session. Please log in again.');
       }
 
-      console.log('Calling process-eft-booking function...');
+      // CRITICAL: Create booking FIRST if we have booking data (new booking)
+      let finalBookingId = bookingId;
+      
+      if (bookingData && !bookingId) {
+        console.log('📝 Creating booking AFTER payment proof upload...');
+        console.log('📋 Booking data being inserted:', JSON.stringify(bookingData, null, 2));
+        
+        // Validate booking_type before insertion
+        const validBookingTypes = ['emergency', 'date_night', 'date_day', 'school_holiday', 'long_term', 'standard'];
+        if (bookingData.booking_type && !validBookingTypes.includes(bookingData.booking_type)) {
+          console.error('❌ Invalid booking_type:', bookingData.booking_type);
+          console.error('Valid types are:', validBookingTypes);
+          throw new Error(`Invalid booking type: ${bookingData.booking_type}. Valid types are: ${validBookingTypes.join(', ')}`);
+        }
+        
+        // Ensure booking_type is set (fallback to 'standard' if missing)
+        if (!bookingData.booking_type) {
+          console.warn('⚠️ booking_type missing, defaulting to "standard"');
+          bookingData.booking_type = 'standard';
+        }
 
-      // Process booking with proof using the real booking ID or invoice ID
+        // Check for overlapping bookings with the same nanny
+        const { data: existingBookings } = await supabase
+          .from('bookings')
+          .select('id, start_date, end_date, booking_type, status')
+          .eq('client_id', bookingData.client_id)
+          .eq('nanny_id', bookingData.nanny_id)
+          .in('status', ['pending', 'confirmed', 'active'])
+          .order('created_at', { ascending: false });
+
+        if (existingBookings && existingBookings.length > 0) {
+          const newStartDate = new Date(bookingData.start_date);
+          const newEndDate = bookingData.end_date ? new Date(bookingData.end_date) : null;
+
+          for (const booking of existingBookings) {
+            const existingStart = new Date(booking.start_date);
+            const existingEnd = booking.end_date ? new Date(booking.end_date) : null;
+
+            // Check if dates overlap
+            let hasOverlap = false;
+
+            if (newEndDate && existingEnd) {
+              // Both have end dates - check for overlap
+              hasOverlap = (newStartDate <= existingEnd && newEndDate >= existingStart);
+            } else if (newEndDate || existingEnd) {
+              // One has end date, one doesn't - check for overlap
+              if (newEndDate) {
+                hasOverlap = (newStartDate <= existingStart && newEndDate >= existingStart);
+              } else {
+                hasOverlap = (newStartDate >= existingStart && existingEnd && newStartDate <= existingEnd);
+              }
+            } else {
+              // Neither has end date (short-term) - check if same start date
+              hasOverlap = (newStartDate.toDateString() === existingStart.toDateString());
+            }
+
+            if (hasOverlap) {
+              console.log('⚠️ Date overlap detected with existing booking:', booking);
+              // Throw a special error that can be caught and handled with a dialog
+              const overlapError: any = new Error('BOOKING_OVERLAP_DETECTED');
+              overlapError.type = 'BOOKING_OVERLAP';
+              overlapError.existingBooking = booking;
+              throw overlapError;
+            }
+          }
+        }
+        
+        // Import calculateAndStoreBookingFinancials if needed
+        const { calculateAndStoreBookingFinancials } = await import('@/services/bookingService');
+        
+        // Create the booking
+        const { data: newBooking, error: bookingError } = await supabase
+          .from('bookings')
+          .insert(bookingData)
+          .select()
+          .single();
+
+        if (bookingError) {
+          console.error('❌ Booking creation error:', bookingError);
+          console.error('❌ Error details:', JSON.stringify(bookingError, null, 2));
+          console.error('❌ Booking data that failed:', JSON.stringify(bookingData, null, 2));
+          throw new Error(`Failed to create booking: ${bookingError.message}`);
+        }
+
+        finalBookingId = newBooking.id;
+        console.log('✅ Booking created after payment proof upload:', finalBookingId);
+
+        // Calculate and store booking financials
+        try {
+          const amountForFinancials = bookingData.total_monthly_cost || 0;
+          const bookingTypeForFinancials = bookingData.booking_type || 'long_term';
+          
+          if (amountForFinancials > 0) {
+            await calculateAndStoreBookingFinancials(
+              finalBookingId,
+              amountForFinancials,
+              bookingTypeForFinancials,
+              amountForFinancials
+            );
+          }
+        } catch (financialError) {
+          console.error('Error preparing booking financials:', financialError);
+          // Don't throw - booking is created, financials can be fixed later
+        }
+      }
+
+      console.log('Calling process-eft-booking function with booking ID:', finalBookingId);
+
+      // Process booking with proof using the booking ID (newly created or existing)
       const { data: functionData, error: eftError } = await supabase.functions.invoke('process-eft-booking', {
         body: {
-          bookingId: bookingId,
+          bookingId: finalBookingId,
           invoiceId: invoiceId,
           paymentReference: reference,
           proofOfPaymentUrl: publicUrl
@@ -254,22 +370,24 @@ const EFTPaymentScreen = () => {
         console.error('❌ Edge function error:', eftError);
         
         // Enhanced fallback: Update booking status AND show user-friendly error
-        console.log('🔄 Attempting fallback update...');
-        const { error: fallbackError } = await supabase
-          .from('bookings')
-          .update({
-            status: 'pending',
-            notes: `EFT Payment - Ref: ${reference}. Proof uploaded: ${publicUrl}. Awaiting admin verification.`
-          })
-          .eq('id', bookingId);
-        
-        if (fallbackError) {
-          console.error('❌ Fallback also failed:', fallbackError);
-          // Show user the actual error with reference for support
-          throw new Error(`Payment proof uploaded but booking update failed. Please contact support with reference: ${reference}`);
+        if (finalBookingId) {
+          console.log('🔄 Attempting fallback update...');
+          const { error: fallbackError } = await supabase
+            .from('bookings')
+            .update({
+              status: 'pending',
+              notes: `EFT Payment - Ref: ${reference}. Proof uploaded: ${publicUrl}. Awaiting admin verification.`
+            })
+            .eq('id', finalBookingId);
+          
+          if (fallbackError) {
+            console.error('❌ Fallback also failed:', fallbackError);
+            // Show user the actual error with reference for support
+            throw new Error(`Payment proof uploaded but booking update failed. Please contact support with reference: ${reference}`);
+          }
+          
+          console.log('✅ Fallback update successful - booking marked as pending');
         }
-        
-        console.log('✅ Fallback update successful - booking marked as pending');
         
         // Show booking created notification after proof upload
         toast({
@@ -297,7 +415,7 @@ const EFTPaymentScreen = () => {
       } else {
         navigate('/booking-confirmation', { 
           state: { 
-            bookingId: bookingId,
+            bookingId: finalBookingId,
             paymentMethod: 'eft',
             amount: totalAmount,
             nannyName: selectedNannyName,
@@ -309,12 +427,26 @@ const EFTPaymentScreen = () => {
 
     } catch (error: any) {
       console.error('Error uploading proof:', error);
-      const errorMessage = error?.message || 'Failed to upload proof of payment. Please try again.';
-      toast({
-        title: "Upload failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      
+      // Check if this is a booking overlap error
+      if (error.type === 'BOOKING_OVERLAP' || error.message === 'BOOKING_OVERLAP_DETECTED') {
+        // Show overlap dialog instead of toast
+        setOverlapBooking(error.existingBooking || {
+          id: '',
+          start_date: '',
+          booking_type: 'unknown',
+          status: 'unknown'
+        });
+        setOverlapDialogOpen(true);
+      } else {
+        // Show regular error toast for other errors
+        const errorMessage = error?.message || 'Failed to upload proof of payment. Please try again.';
+        toast({
+          title: "Upload failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setUploading(false);
     }
@@ -630,7 +762,7 @@ const EFTPaymentScreen = () => {
                 console.log('🔵 Button onClick fired');
                 uploadProofOfPayment();
               }}
-              disabled={!proofFile || uploading || !bookingId}
+              disabled={!proofFile || uploading || (!bookingId && !bookingData && !invoiceId)}
               className="w-full bg-gradient-to-r from-blue-600 to-fuchsia-600 hover:from-blue-700 hover:to-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? (
@@ -653,6 +785,19 @@ const EFTPaymentScreen = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Booking Overlap Dialog */}
+      {overlapBooking && (
+        <BookingOverlapDialog
+          open={overlapDialogOpen}
+          onClose={() => {
+            setOverlapDialogOpen(false);
+            setOverlapBooking(null);
+          }}
+          existingBooking={overlapBooking}
+          nannyName={selectedNanny ? `${selectedNanny.profiles?.first_name || ''} ${selectedNanny.profiles?.last_name || ''}`.trim() : ''}
+        />
+      )}
     </div>
   );
 };

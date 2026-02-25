@@ -23,7 +23,6 @@ import { PublicLayout } from "./layouts/PublicLayout";
 
 // Critical pages (loaded immediately)
 import LandingScreen from "./pages/LandingScreen";
-import SimpleAuthScreen from "./pages/SimpleAuthScreen";
 import LoginScreen from "./pages/LoginScreen";
 import AdminLogin from "./pages/AdminLogin";
 import NannyAuth from "./pages/NannyAuth";

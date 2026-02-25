@@ -49,6 +49,8 @@ export interface UserPreferences {
     cooking: boolean;
   };
   lightHousekeeping?: boolean;
+  gapCoverageType?: 'normal' | 'busy_months' | 'promotional' | 'international' | 'sa_replacement' | 'sa_going_away';
+  isPromotional?: boolean;
 }
 
 export interface PricingBreakdown {

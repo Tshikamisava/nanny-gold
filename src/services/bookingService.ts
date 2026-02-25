@@ -243,11 +243,11 @@ export const createBookingFromPreferences = async (preferences: any, nannyId: st
 
       if (hasOverlap) {
         console.log('⚠️ Date overlap detected with existing booking:', booking);
-        // Phase 3: Improve error message with clear guidance
-        throw new Error(
-          `You already have a pending ${booking.booking_type} booking with this nanny (${booking.status}). ` +
-          `Please complete or cancel it in "My Bookings" before creating a new one.`
-        );
+        // Throw a special error that can be caught and handled with a dialog
+        const overlapError: any = new Error('BOOKING_OVERLAP_DETECTED');
+        overlapError.type = 'BOOKING_OVERLAP';
+        overlapError.existingBooking = booking;
+        throw overlapError;
       }
     }
 

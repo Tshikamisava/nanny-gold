@@ -23,7 +23,7 @@ export const PublicLayout = () => {
                                 onClick={() => navigate('/')}
                             >
                                 <Heart className="h-6 w-6 text-primary fill-primary hidden sm:block" />
-                                <h1 className="text-xl font-bold">
+                                <h1 className="text-xl font-script">
                                     <span className="text-primary">Nanny</span>
                                     <span className="gold-shimmer">Gold</span>
                                 </h1>

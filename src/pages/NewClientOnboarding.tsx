@@ -436,7 +436,10 @@ const NewClientOnboarding = () => {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2">
             <Heart className="w-6 h-6 text-primary" />
-            <span className="text-xl font-bold text-foreground">NannyGold</span>
+            <span className="text-xl font-script">
+              <span className="text-primary">Nanny</span>
+              <span className="gold-shimmer">Gold</span>
+            </span>
           </div>
         </div>
 

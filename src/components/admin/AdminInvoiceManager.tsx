@@ -63,15 +63,15 @@ export const AdminInvoiceManager = () => {
       base_amount: parseFloat(baseAmount),
       apply_rewards: applyRewards,
       description
+    }, {
+      onSuccess: () => {
+        setShowGenerateDialog(false);
+        setSelectedClientId('');
+        setBaseAmount('');
+        setDescription('Service charges');
+        setApplyRewards(false);
+      }
     });
-
-    if (generateInvoice.isSuccess) {
-      setShowGenerateDialog(false);
-      setSelectedClientId('');
-      setBaseAmount('');
-      setDescription('Service charges');
-      setApplyRewards(false);
-    }
   };
 
   const handleSendInvoice = async (invoice: InvoiceWithClient, deliveryMethod: 'email' | 'app' | 'both') => {

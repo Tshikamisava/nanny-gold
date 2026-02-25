@@ -21,42 +21,123 @@ export const useChatRooms = () => {
   const { toast } = useToast();
 
   const loadChatRooms = async () => {
-    // Chat functionality disabled for launch
-    console.log('Chat rooms loading disabled - feature coming soon');
-    setLoading(false);
-    return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('chat_rooms')
+        .select('*')
+        .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
+        .order('last_message_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedRooms: ChatRoom[] = (data || []).map((room: any) => ({
+        room_id: room.id,
+        room_type: room.room_type || 'client_admin',
+        room_name: room.room_name || 'Support Chat',
+        other_participant_id: room.participant_1 === user.id ? room.participant_2 : room.participant_1,
+        other_participant_name: room.participant_1 === user.id ? (room.participant_2_name || 'Support') : (room.participant_1_name || 'Support'),
+        last_message: room.last_message || '',
+        last_message_at: room.last_message_at || room.created_at,
+        unread_count: room.unread_count || 0,
+      }));
+
+      setRooms(formattedRooms);
+    } catch (error) {
+      console.error('Error loading chat rooms:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createOrGetChatRoom = async (
     otherUserId: string, 
     roomType: 'client_admin' | 'client_nanny' = 'client_nanny'
   ): Promise<string | null> => {
-    // Chat functionality disabled for launch
-    console.log('Chat room creation disabled - feature coming soon');
-    toast({
-      title: "Chat Feature Coming Soon",
-      description: "Direct messaging will be available after launch. Please use email support for now.",
-      variant: "default"
-    });
-    return null;
+    if (!user) return null;
+
+    try {
+      // Check for existing room
+      const { data: existing, error: findError } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .or(`and(participant_1.eq.${user.id},participant_2.eq.${otherUserId}),and(participant_1.eq.${otherUserId},participant_2.eq.${user.id})`)
+        .eq('room_type', roomType)
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (existing) return existing.id;
+
+      // Create new room
+      const { data: newRoom, error: createError } = await supabase
+        .from('chat_rooms')
+        .insert({
+          participant_1: user.id,
+          participant_2: otherUserId,
+          room_type: roomType,
+        })
+        .select('id')
+        .single();
+
+      if (createError) throw createError;
+      return newRoom?.id || null;
+    } catch (error) {
+      console.error('Error creating/getting chat room:', error);
+      toast({
+        title: "Chat Error",
+        description: "Unable to open chat. Please try again.",
+        variant: "destructive"
+      });
+      return null;
+    }
   };
 
   const markRoomAsRead = async (roomId: string) => {
-    // Chat functionality disabled for launch
-    console.log('Mark as read disabled - feature coming soon');
-    return;
+    if (!user) return;
+    try {
+      await supabase
+        .from('chat_messages')
+        .update({ read: true })
+        .eq('room_id', roomId)
+        .neq('sender_id', user.id)
+        .eq('read', false);
+    } catch (error) {
+      console.error('Error marking room as read:', error);
+    }
   };
 
-  // Chat functionality disabled - no need to load on user change
   useEffect(() => {
-    console.log('Chat rooms loading disabled for launch');
+    if (user) {
+      loadChatRooms();
+    }
   }, [user]);
 
-  // Chat functionality disabled - no real-time subscriptions needed
+  // Real-time subscription for chat room updates
   useEffect(() => {
-    console.log('Chat subscriptions disabled for launch');
+    if (!user) return;
+
+    const channel = supabase
+      .channel('chat-rooms-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_rooms'
+        },
+        () => {
+          loadChatRooms();
+        }
+      )
+      .subscribe();
+
     return () => {
-      console.log('Chat subscriptions cleanup disabled for launch');
+      supabase.removeChannel(channel);
     };
   }, [user]);
 

@@ -135,7 +135,7 @@ export const InvoiceViewDialog = ({ invoice, open, onOpenChange }: InvoiceViewDi
           <div className="p-4 bg-primary/5 border-l-4 border-primary rounded-lg">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-bold mb-1">
+                <h2 className="text-2xl font-script mb-1">
                   <span className="text-primary">Nanny</span>
                   <span className="gold-shimmer">Gold</span>
                   <span className="text-muted-foreground text-sm ml-2 font-normal">(Pty) Ltd</span>

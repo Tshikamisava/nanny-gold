@@ -5,7 +5,9 @@ export default function NannyTermsConditions() {
     <div className="container mx-auto py-8 px-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">NannyGold Nanny Terms and Conditions</CardTitle>
+          <CardTitle className="text-2xl font-script">
+            <span className="text-primary">Nanny</span><span className="gold-shimmer">Gold</span> Nanny Terms and Conditions
+          </CardTitle>
           <CardDescription>
             Effective Date: 01 October 2025
           </CardDescription>

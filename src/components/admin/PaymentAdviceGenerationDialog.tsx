@@ -40,15 +40,15 @@ export const PaymentAdviceGenerationDialog = () => {
       base_amount: parseFloat(baseAmount),
       period_start: periodStart,
       period_end: periodEnd
+    }, {
+      onSuccess: () => {
+        setOpen(false);
+        setSelectedNannyId('');
+        setBaseAmount('');
+        setPeriodStart('');
+        setPeriodEnd('');
+      }
     });
-
-    if (generateAdvice.isSuccess) {
-      setOpen(false);
-      setSelectedNannyId('');
-      setBaseAmount('');
-      setPeriodStart('');
-      setPeriodEnd('');
-    }
   };
 
   return (

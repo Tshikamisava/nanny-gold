@@ -51,27 +51,30 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Fetch invoice with related data
+    // Fetch invoice data
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select(`
-        *,
-        bookings!inner(
-          id,
-          booking_type,
-          living_arrangement,
-          clients!inner(home_size)
-        )
-      `)
+      .select('*')
       .eq('id', invoice_id)
       .single()
 
     if (invoiceError) throw invoiceError
 
+    // Fetch booking data if booking_id exists (left join equivalent)
+    let bookingData = null
+    if (invoice.booking_id) {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('id, booking_type, living_arrangement')
+        .eq('id', invoice.booking_id)
+        .maybeSingle()
+      bookingData = booking
+    }
+
     // Fetch client profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('first_name, last_name, email')
+      .select('first_name, last_name, email, home_size')
       .eq('id', invoice.client_id)
       .single()
 
@@ -81,7 +84,7 @@ Deno.serve(async (req) => {
     const clientName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
 
     // Map home size to display name
-    const homeSize = invoice.bookings?.clients?.home_size || 'family_hub'
+    const homeSize = profile?.home_size || 'family_hub'
     const homeSizeDisplay = homeSize === 'pocket_palace' ? 'Pocket Palace' :
                             homeSize === 'family_hub' ? 'Family Hub' :
                             homeSize === 'grand_estate' ? 'Grand Estate' :

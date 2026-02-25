@@ -37,12 +37,39 @@ export const useUserReferrals = () => {
       if (!user) throw new Error('User not authenticated');
 
       // Get user's referral code
-      const { data: referralParticipant } = await supabase
+      let { data: referralParticipant } = await supabase
         .from('referral_participants')
         .select('referral_code')
         .eq('user_id', user.id)
         .eq('active', true)
         .single();
+
+      // Auto-enroll if user has no referral code yet
+      if (!referralParticipant) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', user.id)
+          .single();
+        
+        const role = profile?.user_type === 'nanny' ? 'Nanny' : 'Client';
+        const autoCode = user.id.substring(0, 6).toUpperCase()
+          + Math.random().toString(36).substring(2, 5).toUpperCase();
+
+        const { data: newParticipant } = await supabase
+          .from('referral_participants')
+          .insert({
+            user_id: user.id,
+            role,
+            referral_code: autoCode,
+            active: true,
+            notes: 'Auto-enrolled on first visit'
+          })
+          .select('referral_code')
+          .single();
+
+        referralParticipant = newParticipant;
+      }
 
       // Get user's referral logs with referred user details
       const { data: referralLogs } = await supabase

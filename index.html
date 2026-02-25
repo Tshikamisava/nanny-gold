@@ -3,8 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>nanny-gold</title>
+    
+    <!-- Mobile viewport & safe areas -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- PWA & native app meta -->
+    <meta name="theme-color" content="#D946EF" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NannyGold" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- App description for SEO & store listings -->
+    <meta name="description" content="NannyGold - Premium childcare services connecting South African families with professional nannies. Book, manage, and communicate with your nanny." />
+    
+    <!-- Apple touch icons -->
+    <link rel="apple-touch-icon" href="/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="384x384" href="/icon-384x384.png" />
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <title>NannyGold</title>
+    
+    <!-- Prevent flash of white on dark-mode native shell -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      /* Safe area padding for notched devices */
+      :root {
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -31,8 +31,69 @@ export const SERVICE_PRICING = {
     gap_coverage: {
       weekday_rate: 280,
       weekend_rate: 350,
-      min_days: 5,
-      placement_fee: 1500 // Replaces service fee
+      min_days: 10,
+      // Normal days pricing
+      normal: {
+        placement_fee: {
+          short: 750,    // 10 days
+          medium: 1200,  // 11-20 days
+          extended: 1800 // 21-30 days
+        },
+        service_fee_per_day: {
+          short: 370     // 10 days (fixed daily rate)
+          // 11-30 days: Pro-rata (Monthly base + Add-ons) / 31
+        },
+      },
+      // Busy months (Dec/Jan, June/July)
+      busy_months: {
+        placement_fee: {
+          short: 1500,   // 10 days
+          medium: 2000, // 11-20 days
+          extended: 2500 // 21-30 days
+        },
+        service_fee_per_day: {
+          short: 420     // 10 days (fixed daily rate)
+          // 11-30 days: Pro-rata (Monthly base + Add-ons) / 31 + 30% surcharge
+        },
+        surcharge_percentage: 0.30 // 30% surcharge for 11-30 days
+      },
+      // Promotional/Introductory 2026
+      promotional: {
+        // Uses normal pricing but with different payment terms
+        // Placement Fee: Payable over 2 months
+        // Service Fee: 50% in monthly payments before booking, balance on last day
+        payment_terms: {
+          placement_fee_installments: 2, // Over 2 months
+          service_fee_upfront_percentage: 0.50 // 50% before booking starts
+        }
+      },
+      // International families
+      international: {
+        placement_fee: 5000, // Flat R5,000 regardless of days
+        service_fee_per_day: {
+          short: 840     // 10 days (fixed daily rate)
+          // 11-30 days: Pro-rata (Monthly base + Add-ons) / 31 + 10% surcharge
+        },
+        surcharge_percentage: 0.10 // 10% surcharge for 11-30 days
+      },
+      // South African families - replacement nanny
+      sa_replacement: {
+        placement_fee: 2500, // Flat R2,500 regardless of days
+        service_fee_per_day: {
+          short: 420     // 10 days (fixed daily rate)
+          // 11-30 days: Pro-rata (Monthly base + Add-ons) / 31 + 10% surcharge
+        },
+        surcharge_percentage: 0.10 // 10% surcharge for 11-30 days
+      },
+      // South African families - going away within SA
+      sa_going_away: {
+        placement_fee: 3500, // Flat R3,500 regardless of days
+        service_fee_per_day: {
+          short: 420     // 10 days (fixed daily rate)
+          // 11-30 days: Pro-rata (Monthly base + Add-ons) / 31 + 10% surcharge
+        },
+        surcharge_percentage: 0.10 // 10% surcharge for 11-30 days
+      }
     }
   },
 

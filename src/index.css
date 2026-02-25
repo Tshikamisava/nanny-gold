@@ -103,6 +103,38 @@
   }
 }
 
+/* NannyGold Brand Text Styling */
+.font-script {
+  font-family: 'Dancing Script', cursive;
+  font-weight: 600;
+}
+
+.nanny-gold-text {
+  font-family: 'Dancing Script', cursive;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.nanny-gold-text .nanny-part {
+  color: hsl(330 78% 56%); /* Fuchsia pink */
+}
+
+.nanny-gold-text .gold-part {
+  background: linear-gradient(
+    90deg,
+    hsl(38 94% 50%) 0%,
+    hsl(45 100% 60%) 25%,
+    hsl(38 94% 50%) 50%,
+    hsl(45 100% 60%) 75%,
+    hsl(38 94% 50%) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
 /* Mobile-optimized dashboard utilities */
 @layer utilities {
   .container-responsive {
@@ -180,5 +212,49 @@
   
   .client-icon-md {
     @apply h-4 w-4 sm:h-5 sm:h-5;
+  }
+}
+
+/* ── Native Mobile App Styles ──────────────────────── */
+
+/* Safe area padding for notched/island devices */
+.native-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.native-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent text selection & callouts in native app */
+.capacitor-native {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Allow text selection in input fields */
+.capacitor-native input,
+.capacitor-native textarea,
+.capacitor-native [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Smooth keyboard push on mobile */
+body.keyboard-open {
+  transition: height 0.25s ease;
+}
+
+/* Prevent pull-to-refresh in native shell */
+html, body {
+  overscroll-behavior-y: contain;
+}
+
+/* Ensure bottom nav clears iOS home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
   }
 }

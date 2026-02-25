@@ -103,10 +103,26 @@ export const useGenerateClientInvoice = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: async (data) => {
-      // Parse invoice data if it's a string
-      const invoiceData = typeof data === 'string' ? JSON.parse(data) : data;
-      
+    onSuccess: async (invoiceId) => {
+      // The RPC returns just the invoice UUID — fetch full invoice data
+      const { data: invoiceData, error: fetchError } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, client_id, amount, status')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError || !invoiceData) {
+        console.error('Failed to fetch generated invoice:', fetchError);
+        toast({
+          title: "Invoice Generated",
+          description: "Invoice created but could not retrieve details for notifications.",
+          variant: "destructive"
+        });
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['client-invoices'] });
+        return;
+      }
+
       // Invalidate queries first
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['reward_balances'] });

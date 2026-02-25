@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Clock, Calendar as CalendarIcon, GraduationCap, Users, AlertTriangle, Info, Shield, X } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, GraduationCap, Users, AlertTriangle, Info, Shield, X, ArrowLeft, Sparkles, Heart, Brain, Baby, DollarSign, Gift, CheckCircle, XCircle, ChevronDown, ChevronUp, Star, Zap, Lock, CalendarCheck, TrendingUp, Smile, Home, Repeat, Ban } from "lucide-react";
 import { useBooking } from "@/contexts/BookingContext";
 import { addDays, format, differenceInDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +32,9 @@ const ShortTermBooking = () => {
   const [hourlyPricing, setHourlyPricing] = useState<any>(null);
   const [dailyPricing, setDailyPricing] = useState<any>(null);
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false);
+  const [gapCoverageType, setGapCoverageType] = useState<'normal' | 'promotional' | 'busy_months' | null>(null);
+  const [isPromotional, setIsPromotional] = useState(false);
+  const [showPaymentTerms, setShowPaymentTerms] = useState(false);
 
   // Check school holiday availability on mount
   useEffect(() => {
@@ -170,9 +175,11 @@ const ShortTermBooking = () => {
             const dayName = sastDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
             console.log('📅 Date_day booking:', { dayName, isWeekend, rate: isWeekend ? 'R55/hr' : 'R40/hr' });
           }
-        } else if (isDailyBasedBooking(bookingType) && selectedDates.length > 0) {
+        } else if (isDailyBasedBooking(bookingType) && selectedDates.length > 0 && (bookingType !== 'temporary_support' || gapCoverageType)) {
           console.log('📊 Calculating daily pricing...', {
-            selectedDates: selectedDates.length
+            selectedDates: selectedDates.length,
+            gapCoverageType,
+            isPromotional
           });
           // Extract light housekeeping from householdSupport array
           const lightHousekeeping = preferences.householdSupport?.includes('light-housekeeping') || false;
@@ -186,7 +193,9 @@ const ShortTermBooking = () => {
               lightHousekeeping,
               specialNeeds: preferences.specialNeeds || false,
               drivingSupport: preferences.drivingSupport || false
-            }
+            },
+            gapCoverageType || 'normal',
+            isPromotional
           );
           console.log('💰 Daily pricing result:', pricing);
           setDailyPricing(pricing);
@@ -206,9 +215,17 @@ const ShortTermBooking = () => {
       }
     };
     calculatePricing();
-  }, [bookingType, selectedDates, timeSlots, preferences.cooking, preferences.specialNeeds, preferences.drivingSupport]);
+  }, [bookingType, selectedDates, timeSlots, preferences.cooking, preferences.specialNeeds, preferences.drivingSupport, gapCoverageType, isPromotional, preferences.homeSize, preferences.householdSupport]);
   const handleBookingTypeSelect = (type: BookingType) => {
+    // For Gap Coverage, show sub-options instead of directly selecting
+    if (type === 'temporary_support') {
+      setBookingType(type);
+      setGapCoverageType(null); // Reset to show options
+      return;
+    }
+    
     setBookingType(type);
+    setGapCoverageType(null);
 
     // FORCE time slot creation for all short-term booking types
     if (type === 'date_night') {
@@ -236,23 +253,39 @@ const ShortTermBooking = () => {
       bookingSubType: type
     });
   };
+
+  const handleGapCoverageTypeSelect = (type: 'normal' | 'promotional' | 'busy_months') => {
+    setGapCoverageType(type);
+    setIsPromotional(type === 'promotional');
+    
+    // Check if busy months are actually available
+    if (type === 'busy_months') {
+      const now = new Date();
+      const month = now.getMonth(); // 0-11
+      const isBusyMonth = month === 11 || month === 0 || month === 5 || month === 6; // Dec, Jan, June, July
+      
+      if (!isBusyMonth) {
+        alert('Busy month pricing is only available during December/January and June/July');
+        setGapCoverageType(null);
+        return;
+      }
+    }
+    
+    updatePreferences({
+      durationType: 'short_term',
+      bookingSubType: 'temporary_support',
+      gapCoverageType: type,
+      isPromotional: type === 'promotional'
+    });
+  };
   const handleDateSelect = (dates: Date[] | undefined) => {
     if (dates) {
       // Special validation for temporary support (Gap Coverage)
       if (bookingType === 'temporary_support') {
-        if (dates.length < 5) {
-          // Allow selection but will validate on continue
-          setSelectedDates(dates);
-          return;
-        }
-
-        // Validate 5 consecutive days with Sunday exclusion allowed
-        const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
-        const isValidConsecutive = validateConsecutiveDaysWithSundayExclusion(sortedDates);
-        if (!isValidConsecutive) {
-          alert("Gap Coverage requires at least 5 consecutive days (Sundays can be excluded)");
-          return;
-        }
+        // Allow any date selection - just need minimum 10 days total
+        // No need to validate consecutive days or exclude weekends
+        setSelectedDates(dates);
+        return;
       }
 
       // PHASE 5: Validate maximum 1 month for short-term bookings
@@ -320,16 +353,19 @@ const ShortTermBooking = () => {
 
     // Special handling for temporary support (Gap Coverage)
     if (bookingType === 'temporary_support') {
-      if (selectedDates.length < 5) {
-        alert("Gap Coverage requires a minimum of 5 days");
+      if (!gapCoverageType) {
+        alert("Please select a Gap Coverage option first");
+        return;
+      }
+      
+      if (selectedDates.length < 10) {
+        alert("Gap Coverage requires a minimum of 10 days");
         return;
       }
 
-      // Validate minimum 5 days
-      const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
-      const isValidConsecutive = validateConsecutiveDaysWithSundayExclusion(sortedDates);
-      if (!isValidConsecutive) {
-        alert("Gap Coverage requires a minimum of 5 days");
+      // Validate minimum 10 days (any days, including weekends)
+      if (!validateGapCoverageDays(selectedDates)) {
+        alert("Gap Coverage requires a minimum of 10 days. You can select any days including weekends.");
         return;
       }
 
@@ -339,7 +375,9 @@ const ShortTermBooking = () => {
         timeSlots: [],
         // No time slots for daily rate booking
         bookingSubType: bookingType,
-        durationType: 'short_term'
+        durationType: 'short_term',
+        gapCoverageType: gapCoverageType,
+        isPromotional: isPromotional
       });
       navigate('/nanny-preferences');
       return;
@@ -403,9 +441,9 @@ const ShortTermBooking = () => {
     navigate('/schedule-builder');
   };
   // Helper function to validate minimum days for Gap Coverage
-  const validateConsecutiveDaysWithSundayExclusion = (sortedDates: Date[]): boolean => {
-    // Simple validation: minimum 5 days required
-    return sortedDates.length >= 5;
+  const validateGapCoverageDays = (selectedDates: Date[]): boolean => {
+    // Gap Coverage requires minimum 10 days (any days, including weekends)
+    return selectedDates.length >= 10;
   };
   const isDateDisabled = (date: Date) => {
     // Disable past dates
@@ -415,7 +453,7 @@ const ShortTermBooking = () => {
     <div className="flex flex-col items-center justify-center min-h-screen px-4">
       {/* NannyGold Branding */}
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold leading-tight mb-2">
+        <h1 className="text-4xl font-script leading-tight mb-2">
           <span className="text-primary">Nanny</span>
           <span className="gold-shimmer">Gold</span>
         </h1>
@@ -476,7 +514,310 @@ const ShortTermBooking = () => {
                 <p className="text-muted-foreground text-sm">Support during transitions, up to 1 month</p>
               </div>
             </Card>
+          </div>
+        </>}
 
+        {/* Gap Coverage Type Selection - Redesigned UI */}
+        {bookingType === 'temporary_support' && !gapCoverageType && (
+          <div className="space-y-6 max-w-4xl mx-auto">
+            {/* Back Button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setBookingType(null);
+                setGapCoverageType(null);
+              }}
+              className="mb-2"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+
+            {/* Hero Section */}
+            <div className="text-center mb-12">
+              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3 tracking-tight">
+                Gap Cover 2026
+              </h1>
+              <h2 className="text-lg md:text-xl font-medium text-muted-foreground mb-2">
+                Stress-free childcare when your routine changes
+              </h2>
+              <p className="text-sm text-muted-foreground/80 font-light">
+                For holidays, travel, transition season cover
+              </p>
+            </div>
+
+            {/* Future-You Gap Cover (Hero Card) */}
+            <Card className="p-6 rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/5 via-primary/3 to-background cursor-pointer hover:shadow-xl transition-all hover:border-primary/20 relative overflow-hidden group" onClick={() => handleGapCoverageTypeSelect('promotional')}>
+              {/* Limited Period Badge */}
+              <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center backdrop-blur-sm">
+                <Sparkles className="w-4 h-4 text-secondary" strokeWidth={2.5} />
+              </div>
+              
+              <div className="flex items-start gap-5">
+                {/* Icon on Left */}
+                <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/10">
+                  <CalendarCheck className="w-8 h-8 text-primary" strokeWidth={1.5} />
+                </div>
+                
+                {/* Content on Right */}
+                <div className="flex-1 pt-1">
+                  <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
+                    Future-You Gap Cover
+                  </h3>
+                  <p className="text-base font-medium text-muted-foreground mb-3">
+                    Plan now. Stay calm later.
+                  </p>
+                  <p className="text-sm text-muted-foreground/80 leading-relaxed mb-6">
+                    Secure trusted care for December–January, pay over time, avoid the holiday scramble.
+                  </p>
+                  
+                  <Button className="bg-primary hover:bg-primary/90 text-white px-6 py-3 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all w-full">
+                    Secure December Care
+                  </Button>
+
+                  {/* Flexible Payment Terms - Collapsible */}
+                  <Collapsible open={showPaymentTerms} onOpenChange={setShowPaymentTerms} className="mt-4">
+                    <CollapsibleTrigger 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPaymentTerms(!showPaymentTerms);
+                      }}
+                      className="text-sm text-primary hover:text-primary/80 flex items-center gap-2 transition-colors w-full justify-start"
+                    >
+                      <span className="font-medium">Flexible Payment Terms</span>
+                      {showPaymentTerms ? <ChevronUp className="w-4 h-4" strokeWidth={2} /> : <ChevronDown className="w-4 h-4" strokeWidth={2} />}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3 text-sm text-muted-foreground space-y-2.5 bg-white/40 rounded-xl p-4 backdrop-blur-sm">
+                      <p><span className="font-medium">Placement fee:</span> split over 2 months</p>
+                      <p><span className="font-medium">Service fee:</span> 50% paid before booking</p>
+                      <p><span className="font-medium">Balance:</span> paid on last day of care</p>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              </div>
+            </Card>
+
+            {/* Life-as-usual Gap Cover (Card 1) */}
+            <Card className="p-6 rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/3 via-primary/2 to-background cursor-pointer hover:shadow-xl transition-all hover:border-primary/20 group" onClick={() => handleGapCoverageTypeSelect('normal')}>
+              <div className="flex items-start gap-5">
+                {/* Icon on Left */}
+                <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/10">
+                  <Home className="w-8 h-8 text-primary" strokeWidth={1.5} />
+                </div>
+                
+                {/* Content on Right */}
+                <div className="flex-1 pt-1">
+                  <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
+                    Life-as-usual Gap Cover
+                  </h3>
+                  <p className="text-base font-medium text-muted-foreground mb-4">
+                    Reliable care for regular periods
+                  </p>
+                  <Button variant="ghost" className="text-primary hover:text-primary/80 p-0 h-auto font-medium text-sm">
+                    See what's included →
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Holiday Season Gap Cover (Card 2) */}
+            {(() => {
+              const now = new Date();
+              const month = now.getMonth();
+              const isBusyMonth = month === 11 || month === 0 || month === 5 || month === 6;
+              const currentBusyPeriod = month === 11 || month === 0 ? 'Dec–Jan' : month === 5 || month === 6 ? 'Jun–Jul' : null;
+              
+              return (
+                <Card 
+                  className={`p-6 rounded-3xl border cursor-pointer transition-all group ${
+                    isBusyMonth 
+                      ? 'border-secondary/20 bg-gradient-to-br from-secondary/5 via-secondary/3 to-background hover:shadow-xl hover:border-secondary/30' 
+                      : 'border-gray-200 bg-gray-50/50 opacity-60 cursor-not-allowed'
+                  }`}
+                  onClick={() => isBusyMonth && handleGapCoverageTypeSelect('busy_months')}
+                >
+                  <div className="flex items-start gap-5">
+                    {/* Icon on Left */}
+                    <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border ${
+                      isBusyMonth 
+                        ? 'bg-secondary/10 border-secondary/20' 
+                        : 'bg-gray-100 border-gray-200'
+                    }`}>
+                      <Shield className={`w-8 h-8 ${isBusyMonth ? 'text-secondary' : 'text-gray-400'}`} strokeWidth={1.5} />
+                    </div>
+                    
+                    {/* Content on Right */}
+                    <div className="flex-1 pt-1">
+                      <h3 className={`text-2xl font-bold mb-2 tracking-tight ${isBusyMonth ? 'text-foreground' : 'text-gray-500'}`}>
+                        Holiday Season Gap Cover
+                      </h3>
+                      <p className={`text-base font-medium mb-3 ${isBusyMonth ? 'text-muted-foreground' : 'text-gray-400'}`}>
+                        Protection during high-demand holidays
+                      </p>
+                      
+                      {/* Availability Pill */}
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-4 ${
+                        isBusyMonth 
+                          ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        <CalendarIcon className="w-3 h-3" strokeWidth={2} />
+                        <span>{isBusyMonth ? currentBusyPeriod : 'Dec–Jan · Jun–Jul'}</span>
+                      </div>
+                      
+                      {!isBusyMonth && (
+                        <p className="text-xs text-gray-400 mb-4 font-light">
+                          Not available outside busy months
+                        </p>
+                      )}
+                      
+                      <div className={`space-y-2 mb-4 ${isBusyMonth ? 'text-muted-foreground' : 'text-gray-400'}`}>
+                        <p className="text-sm">• Priority matching included</p>
+                        <p className="text-sm">• Seasonal surcharge applies</p>
+                        <p className="text-sm">• Limited availability</p>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className={`w-full rounded-2xl border-2 ${
+                          isBusyMonth 
+                            ? 'border-secondary/30 bg-secondary/5 text-secondary hover:bg-secondary/10' 
+                            : 'border-gray-200 text-gray-400'
+                        }`}
+                        disabled={!isBusyMonth}
+                      >
+                        View Peak Pricing
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
+
+            {/* Why Gap Cover Exists - Expandable Section */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="why-gap-cover" className="border border-primary/10 rounded-2xl px-5 bg-white/60 backdrop-blur-sm">
+                <AccordionTrigger className="text-left font-semibold text-lg py-5 hover:no-underline">
+                  Why Gap Cover Exists
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4 pt-2 pb-4">
+                    <h4 className="font-semibold text-foreground mb-4 text-base">Why Parents Love our Future-You Gap Cover</h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/20">
+                        <Ban className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+                        <p className="text-foreground leading-relaxed">No emotional labour while you're still working</p>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/20">
+                        <Home className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+                        <p className="text-foreground leading-relaxed">No strangers in your home</p>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/20">
+                        <Repeat className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+                        <p className="text-foreground leading-relaxed">No re-explaining routines</p>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/20">
+                        <XCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+                        <p className="text-foreground leading-relaxed">No cancelled plans because of childcare</p>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* What You Get - Expandable Section with Grouped Benefits */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="what-you-get" className="border border-primary/10 rounded-2xl px-5 bg-white/60 backdrop-blur-sm">
+                <AccordionTrigger className="text-left font-semibold text-lg py-5 hover:no-underline">
+                  What You Get
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-5 pt-2 pb-4">
+                    <p className="text-sm font-medium text-muted-foreground mb-5">Included With Every Gap Cover</p>
+                    
+                    {/* Peace of Mind Group */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/2 border border-primary/10">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/10">
+                          <Brain className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                        </div>
+                        <h5 className="font-semibold text-foreground text-base">Peace of Mind</h5>
+                      </div>
+                      <div className="pl-13 space-y-2.5 text-sm">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Familiar, briefed caregivers</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">No-cost replacements</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Backup coverage if plans change</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Child-Centred Care Group */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/2 border border-primary/10">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/10">
+                          <Baby className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                        </div>
+                        <h5 className="font-semibold text-foreground text-base">Child-Centred Care</h5>
+                      </div>
+                      <div className="pl-13 space-y-2.5 text-sm">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Continuity & emotional safety</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Routine-aligned support</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Care matched to your preferences</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Financial Ease Group */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-br from-secondary/5 to-secondary/2 border border-secondary/10">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center border border-secondary/10">
+                          <DollarSign className="w-5 h-5 text-secondary" strokeWidth={1.5} />
+                        </div>
+                        <h5 className="font-semibold text-foreground text-base">Financial Ease</h5>
+                      </div>
+                      <div className="pl-13 space-y-2.5 text-sm">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">Smaller, planned payments over time</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground">No peak panic pricing</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" strokeWidth={2} />
+                          <p className="text-foreground leading-relaxed">R200 credit for your next booking when you refer a friend or fam (t's and c's apply: friend must take up the long term of Gap Cover service until their booking is completed)</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        )}
+
+        {/* Date Selection - Only for non-emergency bookings and after Gap Coverage type is selected */}
+        {bookingType && bookingType !== 'emergency' && (bookingType !== 'temporary_support' || gapCoverageType) && (
+          <div className="space-y-6">
             {/* Live Pricing Display */}
             {(hourlyPricing || dailyPricing) && <Card className="p-4 rounded-xl border-primary/20 bg-primary/5">
               <CardHeader className="pb-2">
@@ -546,10 +887,10 @@ const ShortTermBooking = () => {
               </Button>
             </div>
           </div>
-        </>}
+        )}
 
         {/* Date Selection - Only for non-emergency bookings */}
-        {bookingType && bookingType !== 'emergency' && <div className="space-y-6">
+        {bookingType && bookingType !== 'emergency' && (bookingType !== 'temporary_support' || gapCoverageType) && <div className="space-y-6">
           <Card className="rounded-2xl border-primary/20">
             <CardHeader className="bg-primary/5 rounded-t-2xl border-b border-primary/10">
               <CardTitle className="text-primary text-center">
@@ -577,19 +918,75 @@ const ShortTermBooking = () => {
                 day_outside: "text-muted-foreground opacity-50",
                 day_disabled: "text-muted-foreground opacity-50"
               }} />
-              {selectedDates.length > 0 && bookingType === 'temporary_support' && <div className="mt-3 p-2 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-                <div className="text-center">
-                  <div className="flex items-center justify-center space-x-2 mb-1">
-                    <span className="text-xs font-medium text-primary/80">Total</span>
-                    {selectedDates.length < 6 && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200">
-                      Min 6
-                    </span>}
-                  </div>
-                  <div className="text-xl font-bold text-primary animate-fade-in transition-all duration-300">
-                    R{(selectedDates.length * 250).toLocaleString()}
+              {selectedDates.length > 0 && bookingType === 'temporary_support' && (
+                <div className="mt-4 space-y-3">
+                  {/* Start and End Date Display */}
+                  {selectedDates.length > 0 && (() => {
+                    const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+                    const startDate = sortedDates[0];
+                    const endDate = sortedDates[sortedDates.length - 1];
+                    return (
+                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Start Date:</span>
+                            <div className="font-semibold text-primary">{format(startDate, 'MMM dd, yyyy')}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">End Date:</span>
+                            <div className="font-semibold text-primary">{format(endDate, 'MMM dd, yyyy')}</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-center">
+                          <span className="text-xs text-muted-foreground">
+                            {selectedDates.length} day{selectedDates.length !== 1 ? 's' : ''} selected
+                            {selectedDates.length < 10 && (
+                              <span className="block mt-1 text-orange-600">
+                                (Minimum 10 days required - any days including weekends)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Pricing Display */}
+                  <div className="p-3 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center space-x-2 mb-1">
+                        <span className="text-xs font-medium text-primary/80">Total Service Fee</span>
+                        {selectedDates.length < 10 && (
+                          <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200">
+                            Min 10
+                          </span>
+                        )}
+                      </div>
+                      {dailyPricing ? (
+                        <div className="space-y-1">
+                          <div className="text-xl font-bold text-primary animate-fade-in transition-all duration-300">
+                            {formatCurrency(dailyPricing.total)}
+                          </div>
+                          {dailyPricing.serviceFeePerDay && (
+                            <div className="text-xs text-muted-foreground">
+                              {formatCurrency(dailyPricing.serviceFeePerDay)}/day × {selectedDates.length} days
+                            </div>
+                          )}
+                          {dailyPricing.placementFee && (
+                            <div className="text-xs text-primary/70 mt-1">
+                              + {formatCurrency(dailyPricing.placementFee)} placement fee (payable first)
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Calculating pricing...
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>}
+              )}
             </CardContent>
           </Card>
 
@@ -673,7 +1070,7 @@ const ShortTermBooking = () => {
             </Button>
           </div>
 
-          <Button onClick={handleContinue} disabled={selectedDates.length === 0 || (bookingType === 'date_night' || bookingType === 'date_day') && timeSlots.length === 0} className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-2xl font-semibold disabled:opacity-50">
+          <Button onClick={handleContinue} disabled={selectedDates.length === 0 || (bookingType === 'date_night' || bookingType === 'date_day') && timeSlots.length === 0 || (bookingType === 'temporary_support' && !gapCoverageType)} className="w-full royal-gradient hover:opacity-90 text-white py-3 rounded-2xl font-semibold disabled:opacity-50">
             Continue
           </Button>
 
