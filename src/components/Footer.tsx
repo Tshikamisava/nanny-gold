@@ -24,9 +24,9 @@ export const Footer = () => {
                 <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">care@nannygold.co.za</span>
               </a>
-              <a href="tel:+27662733942" className="flex items-center gap-1 hover:text-primary transition-colors">
+              <a href="tel:+27636922760" className="flex items-center gap-1 hover:text-primary transition-colors">
                 <Phone className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">+27 66 273 3942</span>
+                <span className="hidden sm:inline">063 692 2760</span>
               </a>
             </div>
             <div className="text-center text-[10px] sm:text-xs">
